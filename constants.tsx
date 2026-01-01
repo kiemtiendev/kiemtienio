@@ -1,47 +1,37 @@
 
 import React from 'react';
 import { 
-  Rocket, 
-  User, 
-  CreditCard, 
-  Trophy, 
-  Ticket,
-  Settings,
-  Phone,
-  BookOpen,
-  History,
   LayoutDashboard,
-  Cloud,
   Coins,
-  Users,
+  CreditCard,
+  History,
+  Bot,
   Bell,
-  Bot
+  Ticket,
+  Trophy,
+  Users,
+  BookOpen,
+  User,
+  Cloud
 } from 'lucide-react';
 import { AppView, TaskGate } from './types.ts';
 
-// Điểm chuẩn: 1 VND = 10 Điểm
 export const RATE_VND_TO_POINT = 10;
-// Tỷ lệ Kim cương: 50.000 P (5k VND) = 25 KC -> 1 KC = 2000 P
 export const POINT_PER_DIAMOND = 2000; 
-// Thưởng giới thiệu: 5000 P (500đ)
 export const REFERRAL_REWARD = 5000;
 
 export const WITHDRAW_MILESTONES = [5000, 10000, 20000, 50000, 100000, 200000, 500000];
+export const BLOG_DESTINATION = "https://avudev-verifi.blogspot.com/";
 
-export const VERIFICATION_BLOG_URL = "https://wipsbot.github.io/diamond-nova/verify";
-
+// Fix: Added missing SOCIAL_LINKS constant used in Guide.tsx
 export const SOCIAL_LINKS = {
-  YOUTUBE: "https://youtube.com/@DiamondNova",
-  ZALO: "https://zalo.me/0337117930",
-  ZALO_NUMBER: "0337117930",
-  TELEGRAM: "https://t.me/anhvudev_kiemtienonline_bot",
-  TELEGRAM_HANDLE: "@anhvudev_kiemtienonline_bot",
-  GITHUB: "https://github.com/your-username/diamond-nova"
+  YOUTUBE: "https://www.youtube.com/@diamondnova",
+  TELEGRAM: "https://t.me/diamondnova_hub",
+  FANPAGE: "https://www.facebook.com/diamondnova"
 };
 
 /**
  * Định dạng số theo chuẩn K (Ngàn), M (Triệu), B (Tỷ)
- * Hỗ trợ xử lý giá trị không xác định để tránh lỗi hệ thống.
  */
 export const formatK = (num: number | undefined | null): string => {
   if (num === undefined || num === null || num === 0) return "0";
@@ -59,16 +49,18 @@ export const formatK = (num: number | undefined | null): string => {
   return num.toString();
 };
 
-export const TASK_GATES: TaskGate[] = [
-  { name: 'Link4M', rate: 1000 * RATE_VND_TO_POINT, quota: 2, apiKey: "demo_key" },      
-  { name: 'YeuMoney', rate: 1000 * RATE_VND_TO_POINT, quota: 3, apiKey: "demo_key" },    
-  { name: 'XLink', rate: 500 * RATE_VND_TO_POINT, quota: 2, apiKey: "demo_key" },        
-  { name: 'LayMaNgay', rate: 2000 * RATE_VND_TO_POINT, quota: 3, apiKey: "demo_key" },    
+export const TASK_GATES: (TaskGate & { id: number })[] = [
+  { id: 1, name: 'LINK4M', rate: 1000 * RATE_VND_TO_POINT, quota: 2, apiKey: "68208afab6b8fc60542289b6" },
+  { id: 2, name: 'YEULINK', rate: 800 * RATE_VND_TO_POINT, quota: 4, apiKey: "891b97fa-faa4-4446-bdd3-17add1ea42bc" },
+  { id: 3, name: 'YEUMONEY', rate: 1200 * RATE_VND_TO_POINT, quota: 2, apiKey: "2103f2aa67d874c161e5f4388b2312af6d43742734a8ea41716b8a2cc94b7b02" },
+  { id: 4, name: 'XLINK', rate: 1000 * RATE_VND_TO_POINT, quota: 2, apiKey: "ac55663f-ef85-4849-8ce1-4ca99bd57ce7" },
+  { id: 5, name: 'TRAFFICTOT', rate: 500 * RATE_VND_TO_POINT, quota: 5, apiKey: "578e007b91cceabed9f71903e47ebb3c1be75e91" },
+  { id: 6, name: 'LAYMANET', rate: 1500 * RATE_VND_TO_POINT, quota: 3, apiKey: "ad22fab4209242db6c1bc093898fe2e8" },
 ];
 
 export const NAV_ITEMS = [
   { id: AppView.DASHBOARD, label: 'Trang chủ', icon: <LayoutDashboard /> },
-  { id: AppView.TASKS, label: 'Bắt đầu nhiệm vụ', icon: <Coins /> },
+  { id: AppView.TASKS, label: 'Khai thác điểm', icon: <Coins /> },
   { id: AppView.WITHDRAW, label: 'Rút Thưởng', icon: <CreditCard /> },
   { id: AppView.HISTORY, label: 'Lịch sử rút', icon: <History /> },
   { id: AppView.SUPPORT, label: 'Trợ lý AI Gemini', icon: <Bot /> },

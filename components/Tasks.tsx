@@ -1,22 +1,20 @@
 
 import React, { useState, useEffect } from 'react';
-import { User, TaskGate } from '../types.ts';
+import { User } from '../types.ts';
 import { TASK_GATES, formatK } from '../constants.tsx';
 import { dbService } from '../services/dbService.ts';
+import { getShortLink } from '../services/taskService.ts';
 import { 
   Zap, 
-  ExternalLink, 
-  Key, 
-  CheckCircle2, 
-  AlertCircle, 
   Loader2, 
   ShieldCheck,
-  Sparkles,
-  TrendingUp,
   Cpu,
   Lock,
   ArrowRight,
-  ShieldAlert
+  ShieldAlert,
+  CheckCircle2,
+  ExternalLink,
+  Flame
 } from 'lucide-react';
 
 interface Props {
@@ -25,7 +23,8 @@ interface Props {
 }
 
 interface PendingTask {
-  gate: string;
+  gateId: number;
+  gateName: string;
   points: number;
   token: string;
   timestamp: number;
@@ -34,210 +33,165 @@ interface PendingTask {
 const Tasks: React.FC<Props> = ({ user, onUpdateUser }) => {
   const [activeTask, setActiveTask] = useState<PendingTask | null>(null);
   const [inputToken, setInputToken] = useState('');
-  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error' | 'verifying_url'>('idle');
-  const [generatingGate, setGeneratingGate] = useState<string | null>(null);
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [generatingGate, setGeneratingGate] = useState<number | null>(null);
 
   useEffect(() => {
-    const savedTask = localStorage.getItem('nova_pending_task');
-    let pending: PendingTask | null = null;
-    
-    if (savedTask) {
-      const parsed = JSON.parse(savedTask);
-      if (Date.now() - parsed.timestamp < 1500 * 1000) {
-        pending = parsed;
+    const saved = localStorage.getItem('nova_pending_task');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Date.now() - parsed.timestamp < 1800 * 1000) {
         setActiveTask(parsed);
       } else {
         localStorage.removeItem('nova_pending_task');
       }
     }
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlKey = urlParams.get('key');
-
-    if (urlKey && pending && urlKey === pending.token) {
-      setStatus('verifying_url');
-      setInputToken(urlKey);
-      const timer = setTimeout(() => {
-        handleVerify(urlKey, pending!);
-      }, 1200);
-      const newUrl = window.location.pathname;
-      window.history.replaceState({}, document.title, newUrl);
-      return () => clearTimeout(timer);
-    }
   }, []);
 
-  const generateSecureToken = () => {
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    return `NOVA-${Array.from({ length: 12 }, () => chars.charAt(Math.floor(Math.random() * chars.length))).join("")}`;
+  const generateToken = () => {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    return `NOVA-${Array.from({ length: 8 }, () => chars.charAt(Math.floor(Math.random() * chars.length))).join("")}`;
   };
 
-  const startTask = async (gate: TaskGate) => {
-    if (user.tasksToday >= 10) return;
+  const startTask = async (gate: typeof TASK_GATES[0]) => {
     const currentCount = user.taskCounts[gate.name] || 0;
     if (currentCount >= gate.quota) return;
 
-    setGeneratingGate(gate.name);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    const token = generateSecureToken();
-    const currentUrl = window.location.origin + window.location.pathname;
-    const target_url = `${currentUrl}?key=${token}`;
-    const url_encoded = encodeURIComponent(target_url);
+    setGeneratingGate(gate.id);
+    const token = generateToken();
     
-    const api_key = gate.apiKey || "demo_key";
-    let api_url = `https://link4m.com/st?api=${api_key}&url=${url_encoded}`;
-    if (gate.name === 'LayMaNgay') api_url = `https://laymangay.com/st?api=${api_key}&url=${url_encoded}`;
-
-    const taskData: PendingTask = { gate: gate.name, points: gate.rate, token, timestamp: Date.now() };
-    localStorage.setItem('nova_pending_task', JSON.stringify(taskData));
-    setActiveTask(taskData);
+    const shortLink = await getShortLink(gate.id, gate.apiKey || '', user.id, token);
     
-    dbService.logActivity(user.id, user.fullname, 'Bắt đầu nhiệm vụ', `Gate: ${gate.name} - ${formatK(gate.rate)}P`);
-    
-    window.location.href = api_url;
+    if (shortLink) {
+      const taskData: PendingTask = { 
+        gateId: gate.id, 
+        gateName: gate.name, 
+        points: gate.rate, 
+        token, 
+        timestamp: Date.now() 
+      };
+      localStorage.setItem('nova_pending_task', JSON.stringify(taskData));
+      setActiveTask(taskData);
+      setGeneratingGate(null);
+      window.open(shortLink, "_blank");
+    } else {
+      setGeneratingGate(null);
+      alert("Lỗi khởi tạo cổng khai thác. Vui lòng thử lại!");
+    }
   };
 
-  const handleVerify = (tokenToVerify: string, taskInfo: PendingTask) => {
-    if (!tokenToVerify || status === 'loading') return;
+  const verifyTask = () => {
+    if (!activeTask || !inputToken.trim()) return;
     setStatus('loading');
+
     setTimeout(() => {
-      if (tokenToVerify.trim().toUpperCase() === taskInfo.token) {
+      if (inputToken.trim().toUpperCase() === activeTask.token) {
         const newTaskCounts = { ...user.taskCounts };
-        newTaskCounts[taskInfo.gate] = (newTaskCounts[taskInfo.gate] || 0) + 1;
+        newTaskCounts[activeTask.gateName] = (newTaskCounts[activeTask.gateName] || 0) + 1;
 
         const updatedUser = {
           ...user,
-          balance: user.balance + taskInfo.points,
-          totalEarned: (user.totalEarned || 0) + taskInfo.points,
-          tasksToday: user.tasksToday + 1,
-          tasksWeek: (user.tasksWeek || 0) + 1,
-          taskCounts: newTaskCounts,
-          lastTaskDate: new Date().toISOString()
+          balance: user.balance + activeTask.points,
+          totalEarned: (user.totalEarned || 0) + activeTask.points,
+          tasksToday: (user.tasksToday || 0) + 1,
+          taskCounts: newTaskCounts
         };
-        
+
         onUpdateUser(updatedUser);
-        localStorage.removeItem('nova_pending_task');
-        
-        dbService.logActivity(user.id, user.fullname, 'Hoàn thành nhiệm vụ', `Nhận +${taskInfo.points.toLocaleString()} P từ ${taskInfo.gate}`);
+        dbService.logActivity(user.id, user.fullname, 'Hoàn thành nhiệm vụ', `Nhận +${activeTask.points} P từ ${activeTask.gateName}`);
         
         setStatus('success');
-        setTimeout(() => { 
-          setActiveTask(null); 
-          setStatus('idle'); 
+        localStorage.removeItem('nova_pending_task');
+        setTimeout(() => {
+          setActiveTask(null);
           setInputToken('');
-          setGeneratingGate(null);
+          setStatus('idle');
         }, 3000);
-      } else { 
-        setStatus('error'); 
+      } else {
+        setStatus('error');
         setTimeout(() => setStatus('idle'), 3000);
       }
     }, 1500);
   };
 
-  const dailyProgress = (user.tasksToday / 10) * 100;
-
   return (
-    <div className="space-y-10 animate-in fade-in duration-700">
-      {/* Header Banner - Luxury Mode */}
+    <div className="space-y-12 animate-in fade-in duration-700">
+      {/* Mining Dashboard Banner */}
       <div className="relative overflow-hidden glass-card p-12 md:p-16 rounded-[4rem] border border-white/5 shadow-3xl bg-[#0a0f18] group">
-        <div className="absolute top-0 right-0 p-12 opacity-10 pointer-events-none group-hover:rotate-12 transition-transform duration-1000">
+        <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none group-hover:rotate-12 transition-transform duration-1000">
           <Cpu className="w-80 h-80 text-blue-500" />
         </div>
-        
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-12">
-          <div className="max-w-2xl space-y-8">
-            <div className="inline-flex items-center gap-3 px-6 py-2 bg-blue-600/10 border border-blue-500/20 rounded-2xl text-blue-400 text-xs font-black uppercase tracking-[0.4em] italic shadow-[0_0_15px_rgba(59,130,246,0.2)]">
-              <ShieldCheck className="w-4 h-4" /> NOVA SYSTEM VERIFIED
+          <div className="max-w-xl space-y-6">
+            <div className="inline-flex items-center gap-3 px-6 py-2 bg-blue-600/10 border border-blue-500/20 rounded-2xl text-blue-400 text-xs font-black uppercase tracking-[0.4em] italic shadow-glow-sm">
+              <ShieldCheck className="w-4 h-4" /> SECURE MINING VISION 1.0
             </div>
             <h1 className="text-6xl md:text-8xl font-black text-white leading-none uppercase tracking-tighter italic drop-shadow-2xl">
-              MINING <br />
-              <span className="nova-gradient">CORE</span>
+              MINING <span className="nova-gradient">CORE</span>
             </h1>
-            <p className="text-slate-400 text-lg font-medium leading-relaxed italic max-w-lg">
-              Hệ thống khai thác điểm thưởng thông qua các cổng liên kết an toàn VISION 1.0. Tận hưởng trải nghiệm làm nhiệm vụ đẳng cấp nhất.
+            <p className="text-slate-400 text-lg font-medium leading-relaxed italic">
+              Khai thác điểm thưởng (P) thông qua các cổng liên kết xác thực. Hệ thống tự động quy đổi sang Kim Cương Free Fire hoặc VNĐ.
             </p>
           </div>
-
-          <div className="w-full lg:w-[400px] glass-card p-10 rounded-[3.5rem] border border-white/10 bg-slate-950/50 backdrop-blur-3xl shadow-2xl relative overflow-hidden">
-            <div className={`absolute top-0 left-0 h-1.5 transition-all duration-1000 ${user.tasksToday >= 10 ? 'bg-red-500 shadow-[0_0_20px_rgba(239,68,68,0.8)]' : 'bg-blue-600 shadow-[0_0_20px_rgba(59,130,246,0.8)]'}`} style={{ width: `${dailyProgress}%` }}></div>
-            
-            <div className="flex justify-between items-end mb-8">
-              <div className="space-y-2">
-                <span className="text-[11px] font-black text-slate-500 uppercase tracking-widest block italic">Tiến trình khai thác</span>
-                <div className="flex items-baseline gap-3">
-                  <h2 className={`text-6xl font-black italic tracking-tighter leading-none ${user.tasksToday >= 10 ? 'text-red-500' : 'text-white'}`}>{user.tasksToday}</h2>
-                  <span className="text-slate-600 font-black text-xl uppercase tracking-widest">/ 10</span>
+          
+          <div className="w-full lg:w-[380px] glass-card p-10 rounded-[3.5rem] border border-white/10 bg-slate-950/50 backdrop-blur-3xl shadow-2xl">
+             <div className="flex justify-between items-end mb-8">
+                <div className="space-y-1">
+                   <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block italic">Tổng khai thác hôm nay</span>
+                   <h2 className="text-6xl font-black text-white italic tracking-tighter">{user.tasksToday || 0}</h2>
                 </div>
-              </div>
-              <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
-                <TrendingUp className={`w-8 h-8 ${user.tasksToday >= 10 ? 'text-red-500' : 'text-blue-500 animate-pulse'}`} />
-              </div>
-            </div>
-
-            <div className="h-4 w-full bg-black rounded-full overflow-hidden border border-white/5 p-1">
-              <div 
-                className={`h-full transition-all duration-1000 rounded-full ${user.tasksToday >= 10 ? 'bg-gradient-to-r from-red-600 to-rose-700' : 'bg-gradient-to-r from-blue-600 to-indigo-700'}`} 
-                style={{ width: `${dailyProgress}%` }}
-              />
-            </div>
-            <p className="mt-4 text-[10px] font-black text-slate-700 text-center uppercase tracking-[0.3em]">RESETS AT 00:00 AM</p>
+                <div className="p-4 bg-blue-600/20 rounded-2xl text-blue-500 border border-blue-500/20">
+                   <Flame className="w-8 h-8 animate-pulse" />
+                </div>
+             </div>
+             <div className="h-2 w-full bg-slate-900 rounded-full overflow-hidden border border-white/5">
+                <div className="h-full bg-blue-600 shadow-[0_0_15px_rgba(59,130,246,0.6)] transition-all" style={{ width: `${Math.min((user.tasksToday || 0) * 10, 100)}%` }} />
+             </div>
           </div>
         </div>
       </div>
 
-      {/* Task Gates Grid - Prestige Design */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+      {/* Grid 6 Nhiệm vụ */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {TASK_GATES.map((gate) => {
           const currentCount = user.taskCounts[gate.name] || 0;
           const isFull = currentCount >= gate.quota;
-          const isDisabled = isFull || user.tasksToday >= 10;
-          const isGenerating = generatingGate === gate.name;
-          const gateProgress = (currentCount / gate.quota) * 100;
+          const isGenerating = generatingGate === gate.id;
 
           return (
-            <div key={gate.name} className={`glass-card p-10 rounded-[3.5rem] border-2 transition-all duration-700 group relative overflow-hidden flex flex-col justify-between shadow-2xl ${isDisabled ? 'border-red-500/10 opacity-40 grayscale pointer-events-none' : 'hover:border-blue-500/50 border-white/5 bg-[#0d121c] hover:bg-[#111827]'}`}>
-              {/* Background Accent */}
-              <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/5 blur-[60px] group-hover:bg-blue-600/10 transition-colors"></div>
-              
+            <div key={gate.id} className={`glass-card p-10 rounded-[3.5rem] border-2 transition-all duration-500 group relative overflow-hidden flex flex-col justify-between shadow-2xl ${isFull ? 'border-red-500/10 opacity-50 grayscale' : 'hover:border-blue-500/50 border-white/5 bg-[#0d121c]'}`}>
               <div className="relative z-10">
-                <div className="flex justify-between items-start mb-10">
-                  <div className="space-y-2">
-                    <h3 className="font-black text-3xl text-white uppercase italic tracking-tighter group-hover:nova-gradient transition-all">{gate.name}</h3>
-                    <div className="flex items-center gap-2">
-                       <span className="px-2 py-0.5 bg-blue-600/10 border border-blue-500/20 text-blue-400 text-[8px] font-black rounded uppercase tracking-widest italic">GATE VERIFIED</span>
-                    </div>
+                <div className="flex justify-between items-start mb-8">
+                  <div>
+                    <h3 className="font-black text-3xl text-white uppercase italic tracking-tighter">{gate.name}</h3>
+                    <span className="text-[9px] font-black text-blue-500 uppercase tracking-widest italic">Node #{gate.id.toString().padStart(2, '0')}</span>
                   </div>
-                  <div className={`p-3 rounded-2xl bg-slate-950 border border-white/10 ${isDisabled ? 'text-slate-700' : 'text-blue-500'}`}>
+                  <div className={`p-3 rounded-2xl bg-slate-950 border border-white/10 ${isFull ? 'text-red-500' : 'text-blue-500'}`}>
                     {isFull ? <Lock className="w-6 h-6" /> : <Zap className="w-6 h-6" />}
                   </div>
                 </div>
 
-                <div className="space-y-6 mb-12">
-                   <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Lợi nhuận</span>
-                      <span className="text-2xl font-black text-white italic tracking-tighter">+{formatK(gate.rate)} <span className="text-xs text-slate-600 uppercase">P</span></span>
-                   </div>
-                   <div className="space-y-2">
-                      <div className="flex justify-between text-[9px] font-black uppercase italic tracking-widest">
-                         <span className="text-slate-600">Hạn mức cổng</span>
-                         <span className="text-blue-400">{currentCount} / {gate.quota}</span>
-                      </div>
-                      <div className="h-1.5 w-full bg-slate-950 rounded-full overflow-hidden border border-white/5">
-                        <div className="h-full bg-blue-600 transition-all duration-1000" style={{ width: `${gateProgress}%` }} />
-                      </div>
-                   </div>
+                <div className="space-y-4 mb-10">
+                  <div className="flex items-center justify-between px-2">
+                    <span className="text-[11px] font-black text-slate-500 uppercase">Lợi nhuận</span>
+                    <span className="text-2xl font-black text-white italic">+{formatK(gate.rate)} P</span>
+                  </div>
+                  <div className="flex items-center justify-between px-2">
+                    <span className="text-[11px] font-black text-slate-500 uppercase">Giới hạn</span>
+                    <span className="text-sm font-black text-slate-300 italic">{currentCount} / {gate.quota} Lượt</span>
+                  </div>
                 </div>
               </div>
 
               <button 
                 onClick={() => startTask(gate)} 
-                disabled={isDisabled || isGenerating} 
-                className={`w-full h-16 rounded-2xl font-black uppercase italic text-xs tracking-[0.2em] transition-all flex items-center justify-center gap-3 relative overflow-hidden group/btn ${isDisabled ? 'bg-slate-900 text-slate-600' : 'bg-white text-black hover:bg-blue-600 hover:text-white shadow-xl active:scale-95'}`}
+                disabled={isFull || isGenerating}
+                className={`w-full h-16 rounded-2xl font-black uppercase italic text-xs tracking-[0.2em] transition-all flex items-center justify-center gap-3 relative overflow-hidden ${isFull ? 'bg-slate-900 text-slate-600' : 'bg-white text-black hover:bg-blue-600 hover:text-white shadow-xl active:scale-95'}`}
               >
-                {isGenerating ? <Loader2 className="w-6 h-6 animate-spin" /> : isFull ? 'HẾT QUOTA' : (
+                {isGenerating ? <Loader2 className="w-6 h-6 animate-spin" /> : isFull ? 'QUOTA REACHED' : (
                   <>
-                    <span>KHỞI CHẠY CORE</span>
-                    <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-2 transition-transform" />
+                    <span>KHỞI CHẠY NODE</span>
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" />
                   </>
                 )}
               </button>
@@ -246,44 +200,39 @@ const Tasks: React.FC<Props> = ({ user, onUpdateUser }) => {
         })}
       </div>
 
-      {/* Terminal Verification - Prestige Mode */}
+      {/* Verification Terminal */}
       {activeTask && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 animate-in fade-in duration-500">
           <div className="absolute inset-0 bg-black/95 backdrop-blur-3xl" onClick={() => setActiveTask(null)}></div>
-          <div className="glass-card w-full max-w-xl p-12 md:p-16 rounded-[4rem] border border-blue-500/30 relative animate-in zoom-in-95 shadow-[0_0_150px_rgba(59,130,246,0.2)] bg-[#0a0f18]">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent"></div>
-            
+          <div className="glass-card w-full max-w-xl p-12 md:p-16 rounded-[4rem] border border-blue-500/30 relative shadow-[0_0_100px_rgba(59,130,246,0.15)] bg-[#0a0f18]">
             <div className="text-center space-y-8 mb-12">
-               <div className="w-24 h-24 bg-blue-600/10 rounded-[2.5rem] flex items-center justify-center mx-auto border border-blue-500/20 shadow-[0_0_30px_rgba(59,130,246,0.2)]">
+               <div className="w-24 h-24 bg-blue-600/10 rounded-[2.5rem] flex items-center justify-center mx-auto border border-blue-500/20">
                   <ShieldCheck className="w-12 h-12 text-blue-500 animate-pulse" />
                </div>
                <div>
-                  <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter mb-3">SECURE TERMINAL</h2>
-                  <p className="text-slate-500 text-xs font-black uppercase tracking-[0.4em] italic">Nhập mã định danh nhiệm vụ VISION 1.0</p>
+                  <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter mb-2">SECURE TERMINAL</h2>
+                  <p className="text-slate-500 text-xs font-black uppercase tracking-[0.3em] italic">Nhập mã định danh từ Blog xác thực</p>
                </div>
             </div>
 
-            <div className="space-y-10">
-              <div className="relative group">
-                <div className="absolute -inset-1 bg-blue-600/20 rounded-2xl blur-lg group-focus-within:bg-blue-600/40 transition-all"></div>
-                <input 
-                  type="text" 
-                  value={inputToken} 
-                  onChange={e => setInputToken(e.target.value)} 
-                  placeholder="NOVA-XXXX-XXXX-XXXX" 
-                  className="relative w-full bg-slate-950 border-2 border-slate-800 rounded-3xl px-10 py-8 text-white text-center font-black tracking-[0.3em] outline-none transition-all text-xl uppercase focus:border-blue-600 shadow-3xl"
-                />
-              </div>
+            <div className="space-y-8">
+              <input 
+                type="text" 
+                value={inputToken} 
+                onChange={e => setInputToken(e.target.value)} 
+                placeholder="NOVA-XXXX-XXXX" 
+                className="w-full bg-slate-950 border-2 border-slate-800 rounded-3xl px-8 py-8 text-white text-center font-black tracking-[0.3em] outline-none transition-all text-xl uppercase focus:border-blue-600 shadow-3xl"
+              />
 
               <div className="grid grid-cols-2 gap-6">
                 <button 
                   onClick={() => setActiveTask(null)}
                   className="py-6 rounded-2xl bg-slate-900 border border-white/5 text-slate-500 font-black uppercase italic tracking-widest text-[10px] hover:bg-slate-800 transition-all"
                 >
-                  HỦY GIAO DỊCH
+                  HỦY BỎ
                 </button>
                 <button 
-                  onClick={() => handleVerify(inputToken, activeTask)}
+                  onClick={verifyTask}
                   className="bg-blue-600 hover:bg-blue-500 text-white font-black py-6 rounded-2xl shadow-2xl shadow-blue-600/40 uppercase tracking-[0.2em] transition-all italic active:scale-95 flex items-center justify-center gap-3"
                 >
                   {status === 'loading' ? <Loader2 className="w-7 h-7 animate-spin" /> : (
@@ -296,19 +245,24 @@ const Tasks: React.FC<Props> = ({ user, onUpdateUser }) => {
               </div>
             </div>
 
-            {status === 'error' && (
-              <div className="mt-8 flex items-center justify-center gap-3 text-red-500 font-black uppercase italic text-[10px] tracking-widest animate-bounce">
-                <ShieldAlert className="w-5 h-5" />
-                MÃ XÁC THỰC KHÔNG HỢP LỆ!
+            {status === 'success' && (
+              <div className="mt-8 text-emerald-500 font-black uppercase italic text-center text-xs tracking-widest animate-bounce">
+                + {activeTask.points.toLocaleString()} P ĐÃ ĐƯỢC CỘNG VÀO CORE!
               </div>
             )}
             
-            <div className="mt-12 opacity-10 text-center">
-               <span className="text-[9px] font-black uppercase tracking-[0.8em] text-white">VISION 1.0 SECURE MINING</span>
-            </div>
+            {status === 'error' && (
+              <div className="mt-8 text-red-500 font-black uppercase italic text-center text-xs tracking-widest">
+                <ShieldAlert className="w-4 h-4 inline mr-2" /> MÃ KHÔNG HỢP LỆ!
+              </div>
+            )}
           </div>
         </div>
       )}
+      
+      <style>{`
+        .shadow-glow-sm { box-shadow: 0 0 20px rgba(59, 130, 246, 0.3); }
+      `}</style>
     </div>
   );
 };
