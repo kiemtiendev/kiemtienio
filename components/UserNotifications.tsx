@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
-import { dbService } from '../services/dbService';
-import { User, AdminNotification, Announcement } from '../types';
+import { dbService } from '../services/dbService.ts';
+import { User, AdminNotification, Announcement } from '../types.ts';
 import { Bell, Info, Megaphone, Zap, CreditCard, Users, History } from 'lucide-react';
 
 interface Props {

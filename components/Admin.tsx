@@ -1,8 +1,8 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { User, WithdrawalRequest, Giftcode, Announcement, AdBanner, AdminNotification, ActivityLog } from '../types';
-import { dbService } from '../services/dbService';
-import { formatK } from '../constants';
+import { User, WithdrawalRequest, Giftcode, Announcement, AdBanner, AdminNotification, ActivityLog } from '../types.ts';
+import { dbService } from '../services/dbService.ts';
+import { formatK } from '../constants.tsx';
 import { 
   Users, 
   CreditCard, 

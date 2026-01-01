@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { askGeminiSupport } from '../services/geminiService';
-import { dbService } from '../services/dbService';
+import { askGeminiSupport } from '../services/geminiService.ts';
+import { dbService } from '../services/dbService.ts';
 import { 
   Send, 
   Bot, 

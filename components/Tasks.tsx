@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { User, TaskGate } from '../types';
-import { TASK_GATES, formatK } from '../constants';
-import { dbService } from '../services/dbService';
+import { User, TaskGate } from '../types.ts';
+import { TASK_GATES, formatK } from '../constants.tsx';
+import { dbService } from '../services/dbService.ts';
 import { 
   Zap, 
   ExternalLink, 

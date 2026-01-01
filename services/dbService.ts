@@ -1,6 +1,6 @@
 
-import { User, Giftcode, WithdrawalRequest, AdminNotification, AccountRecord, Announcement, AdBanner, ActivityLog } from '../types';
-import { REFERRAL_REWARD, RATE_VND_TO_POINT } from '../constants';
+import { User, Giftcode, WithdrawalRequest, AdminNotification, AccountRecord, Announcement, AdBanner, ActivityLog } from '../types.ts';
+import { REFERRAL_REWARD, RATE_VND_TO_POINT } from '../constants.tsx';
 
 const STORAGE_KEY_USER = 'diamond_earn_user_session';
 const STORAGE_KEY_ACCOUNTS = 'diamond_earn_accounts'; 

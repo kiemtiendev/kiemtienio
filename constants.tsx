@@ -16,7 +16,7 @@ import {
   Users,
   Bell
 } from 'lucide-react';
-import { AppView, TaskGate } from './types';
+import { AppView, TaskGate } from './types.ts';
 
 // Điểm chuẩn: 1 VND = 10 Điểm
 export const RATE_VND_TO_POINT = 10;

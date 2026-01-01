@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { User, WithdrawalRequest } from '../types';
-import { WITHDRAW_MILESTONES, RATE_VND_TO_POINT, formatK, POINT_PER_DIAMOND } from '../constants';
-import { dbService } from '../services/dbService';
+import { User, WithdrawalRequest } from '../types.ts';
+import { WITHDRAW_MILESTONES, RATE_VND_TO_POINT, formatK, POINT_PER_DIAMOND } from '../constants.tsx';
+import { dbService } from '../services/dbService.ts';
 import { Building2, Gamepad2, Wallet, CheckCircle, Loader2, History } from 'lucide-react';
 
 interface Props {
@@ -169,7 +169,7 @@ const Withdraw: React.FC<Props> = ({ user, onUpdateUser, initialHistory = false 
                  <CheckCircle className="w-10 h-10 text-emerald-500" />
               </div>
               <h2 className="text-3xl font-black text-white uppercase italic mb-4">THÀNH CÔNG!</h2>
-              <p className="text-slate-400 font-medium italic mb-8">Yêu cầu của bạn đã được gửi tới Admin. Vui lòng đợi 5-30 phút để xử lý.</p>
+              <p className="text-slate-400 font-medium italic mb-4">Yêu cầu của bạn đã được gửi tới Admin. Vui lòng đợi 5-30 phút để xử lý.</p>
               <button onClick={() => setIsSuccess(false)} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-5 rounded-2xl uppercase tracking-widest italic transition-all">OK, TÔI ĐÃ HIỂU</button>
            </div>
         </div>

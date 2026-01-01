@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { User } from '../types';
-import { dbService } from '../services/dbService';
+import { User } from '../types.ts';
+import { dbService } from '../services/dbService.ts';
 import { 
   Ticket, 
   Sparkles, 
@@ -57,7 +57,7 @@ const Giftcode: React.FC<Props> = ({ user, onUpdateUser }) => {
   return (
     <div className="max-w-2xl mx-auto py-10 animate-in fade-in duration-500">
       <div className="glass-card rounded-[2.5rem] p-10 relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
+        <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none pointer-events-none">
           <Ticket className="w-48 h-48 text-rose-500" />
         </div>
 

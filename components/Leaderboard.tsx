@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
-import { dbService } from '../services/dbService';
-import { formatK } from '../constants';
+import { dbService } from '../services/dbService.ts';
+import { formatK } from '../constants.tsx';
 import { 
   Trophy, 
   Medal, 

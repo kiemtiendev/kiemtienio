@@ -1,8 +1,8 @@
 
 import React, { useMemo, useEffect, useState, useRef } from 'react';
-import { User, AppView } from '../types';
-import { dbService } from '../services/dbService';
-import { formatK } from '../constants';
+import { User, AppView } from '../types.ts';
+import { dbService } from '../services/dbService.ts';
+import { formatK } from '../constants.tsx';
 import { 
   ArrowUpRight, 
   Megaphone, 
@@ -186,7 +186,6 @@ const Dashboard: React.FC<Props> = ({ user, setView }) => {
         />
       </div>
 
-      {/* Bảng thông báo hoạt động cá nhân - NEW SECTION */}
       <div className="glass-card p-10 rounded-[3.5rem] border border-white/5 bg-slate-900/10 shadow-inner">
         <div className="flex items-center gap-5 mb-8">
            <div className="p-4 bg-blue-600/20 rounded-2xl text-blue-400 border border-blue-500/20">
