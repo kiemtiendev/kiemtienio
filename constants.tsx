@@ -16,6 +16,10 @@ import {
 } from 'lucide-react';
 import { AppView, TaskGate } from './types.ts';
 
+// Cấu hình tài chính
+export const ADMIN_ID = "7790668848";
+export const EXCHANGE_RATE = 22000; // 1$ = 22k
+export const POINT_EXCHANGE = 10;   // 1 VNĐ = 10 điểm
 export const RATE_VND_TO_POINT = 10;
 export const POINT_PER_DIAMOND = 2000; 
 export const REFERRAL_REWARD = 5000;
@@ -23,7 +27,6 @@ export const REFERRAL_REWARD = 5000;
 export const WITHDRAW_MILESTONES = [5000, 10000, 20000, 50000, 100000, 200000, 500000];
 export const BLOG_DESTINATION = "https://avudev-verifi.blogspot.com/";
 
-// Fix: Added missing SOCIAL_LINKS constant used in Guide.tsx
 export const SOCIAL_LINKS = {
   YOUTUBE: "https://www.youtube.com/@diamondnova",
   TELEGRAM: "https://t.me/diamondnova_hub",
@@ -31,32 +34,35 @@ export const SOCIAL_LINKS = {
 };
 
 /**
- * Định dạng số theo chuẩn K (Ngàn), M (Triệu), B (Tỷ)
+ * Danh sách 6 cổng nhiệm vụ chính thức
+ * Cấu hình: ID, Tên, Thưởng (P), Giới hạn lượt, API Key
  */
+export const TASK_RATES: Record<number, { name: string, reward: number, limit: number, apiKey: string }> = {
+  1: { name: "LINK4M", reward: 1320, limit: 2, apiKey: "68208afab6b8fc60542289b6" },
+  2: { name: "YEULINK", reward: 1320, limit: 4, apiKey: "891b97fa-faa4-4446-bdd3-17add1ea42bc" },
+  3: { name: "YEUMONEY", reward: 1050, limit: 3, apiKey: "2103f2aa67d874c161e5f4388b2312af6d43742734a8ea41716b8a2cc94b7b02" },
+  4: { name: "XLINK", reward: 1320, limit: 2, apiKey: "ac55663f-ef85-4849-8ce1-4ca99bd57ce7" },
+  5: { name: "TRAFFICTOT", reward: 1320, limit: 5, apiKey: "578e007b91cceabed9f71903e47ebb3c1be75e91" },
+  6: { name: "LAYMANET", reward: 1320, limit: 3, apiKey: "ad22fab4209242db6c1bc093898fe2e8" }
+};
+
+// Map lại sang định dạng TaskGate cho UI cũ (nếu cần)
+export const TASK_GATES: (TaskGate & { id: number })[] = Object.entries(TASK_RATES).map(([id, data]) => ({
+  id: parseInt(id),
+  name: data.name,
+  rate: data.reward,
+  quota: data.limit,
+  apiKey: data.apiKey
+}));
+
 export const formatK = (num: number | undefined | null): string => {
   if (num === undefined || num === null || num === 0) return "0";
   const absNum = Math.abs(num);
-  
-  if (absNum >= 1000000000) {
-    return (num / 1000000000).toFixed(1).replace(/\.0$/, '') + 'B';
-  }
-  if (absNum >= 1000000) {
-    return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
-  }
-  if (absNum >= 1000) {
-    return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
-  }
+  if (absNum >= 1000000000) return (num / 1000000000).toFixed(1).replace(/\.0$/, '') + 'B';
+  if (absNum >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (absNum >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
   return num.toString();
 };
-
-export const TASK_GATES: (TaskGate & { id: number })[] = [
-  { id: 1, name: 'LINK4M', rate: 1000 * RATE_VND_TO_POINT, quota: 2, apiKey: "68208afab6b8fc60542289b6" },
-  { id: 2, name: 'YEULINK', rate: 800 * RATE_VND_TO_POINT, quota: 4, apiKey: "891b97fa-faa4-4446-bdd3-17add1ea42bc" },
-  { id: 3, name: 'YEUMONEY', rate: 1200 * RATE_VND_TO_POINT, quota: 2, apiKey: "2103f2aa67d874c161e5f4388b2312af6d43742734a8ea41716b8a2cc94b7b02" },
-  { id: 4, name: 'XLINK', rate: 1000 * RATE_VND_TO_POINT, quota: 2, apiKey: "ac55663f-ef85-4849-8ce1-4ca99bd57ce7" },
-  { id: 5, name: 'TRAFFICTOT', rate: 500 * RATE_VND_TO_POINT, quota: 5, apiKey: "578e007b91cceabed9f71903e47ebb3c1be75e91" },
-  { id: 6, name: 'LAYMANET', rate: 1500 * RATE_VND_TO_POINT, quota: 3, apiKey: "ad22fab4209242db6c1bc093898fe2e8" },
-];
 
 export const NAV_ITEMS = [
   { id: AppView.DASHBOARD, label: 'Trang chủ', icon: <LayoutDashboard /> },
