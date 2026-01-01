@@ -80,7 +80,7 @@ const Admin: React.FC<Props> = ({ user }) => {
       setShowModal(null);
       refreshData();
     } catch (err: any) {
-      alert("Lỗi khi tạo quảng cáo: " + (err.message || "Bảng 'ads' chưa tồn tại hoặc bị lỗi RLS."));
+      alert("Lỗi khi tạo quảng cáo. Hãy đảm bảo bạn đã chạy mã SQL ở Tab Hệ Thống.");
     }
   };
 
@@ -105,7 +105,7 @@ const Admin: React.FC<Props> = ({ user }) => {
       setShowModal(null);
       refreshData();
     } catch (err: any) {
-      alert("Lỗi khi tạo thông báo: " + (err.message || "Bảng 'announcements' chưa tồn tại."));
+      alert("Lỗi khi tạo thông báo. Hãy đảm bảo bảng 'announcements' đã sẵn sàng.");
     }
   };
 
@@ -130,7 +130,7 @@ const Admin: React.FC<Props> = ({ user }) => {
       setShowModal(null);
       refreshData();
     } catch (err: any) {
-      alert("Lỗi khi tạo Giftcode: " + (err.message || "Bảng 'giftcodes' chưa tồn tại."));
+      alert("Lỗi khi tạo Giftcode. Hãy đảm bảo bảng 'giftcodes' đã sẵn sàng.");
     }
   };
 
@@ -148,6 +148,7 @@ const Admin: React.FC<Props> = ({ user }) => {
 
   const copySql = () => {
     const sql = `-- MÃ KHỞI TẠO DATABASE DIAMOND NOVA (FULL STABLE)
+ALTER TABLE public.users_data ADD COLUMN IF NOT EXISTS reset_code TEXT;
 ALTER TABLE public.announcements ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
 ALTER TABLE public.giftcodes ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
 ALTER TABLE public.ads ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
@@ -170,7 +171,8 @@ CREATE TABLE IF NOT EXISTS public.users_data (
     id_game TEXT DEFAULT '',
     task_counts JSONB DEFAULT '{}'::jsonb,
     referral_count INTEGER DEFAULT 0,
-    referral_bonus NUMERIC DEFAULT 0
+    referral_bonus NUMERIC DEFAULT 0,
+    reset_code TEXT
 );
 
 CREATE TABLE IF NOT EXISTS public.withdrawals (
@@ -210,6 +212,17 @@ CREATE TABLE IF NOT EXISTS public.giftcodes (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS public.notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    type TEXT,
+    title TEXT,
+    content TEXT,
+    user_id TEXT DEFAULT 'all',
+    user_name TEXT DEFAULT 'System',
+    is_read BOOLEAN DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS public.activity_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id TEXT,
@@ -224,6 +237,7 @@ ALTER TABLE public.withdrawals DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ads DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.announcements DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.giftcodes DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.notifications DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.activity_logs DISABLE ROW LEVEL SECURITY;`;
     navigator.clipboard.writeText(sql);
     setSqlCopied(true);
@@ -468,32 +482,12 @@ ALTER TABLE public.activity_logs DISABLE ROW LEVEL SECURITY;`;
                  <p className="text-slate-400 text-sm font-medium italic leading-relaxed">Sử dụng đoạn mã này để đồng bộ mọi bảng cần thiết cho hệ thống.</p>
                  <div className="relative group">
                     <pre className="w-full bg-black/80 border border-slate-800 rounded-2xl p-8 text-blue-400 font-mono text-[10px] overflow-x-auto max-h-72 italic">
-                       {`-- COPPY TOÀN BỘ MÃ NÀY --
+                       {`ALTER TABLE public.users_data ADD COLUMN IF NOT EXISTS reset_code TEXT;
 ALTER TABLE public.announcements ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
 ALTER TABLE public.giftcodes ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
 ALTER TABLE public.ads ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
 
--- Các bảng cơ bản
-CREATE TABLE IF NOT EXISTS public.users_data (
-    id TEXT PRIMARY KEY,
-    admin_id TEXT,
-    email TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
-    fullname TEXT NOT NULL,
-    balance NUMERIC DEFAULT 0,
-    points NUMERIC DEFAULT 0,
-    total_earned NUMERIC DEFAULT 0,
-    is_admin BOOLEAN DEFAULT false,
-    is_banned BOOLEAN DEFAULT false,
-    join_date TIMESTAMPTZ DEFAULT NOW(),
-    last_task_date TIMESTAMPTZ,
-    referred_by TEXT,
-    bank_info TEXT DEFAULT '',
-    id_game TEXT DEFAULT '',
-    task_counts JSONB DEFAULT '{}'::jsonb,
-    referral_count INTEGER DEFAULT 0,
-    referral_bonus NUMERIC DEFAULT 0
-);`}
+-- ... (Copy toàn bộ mã trong tab Setup và chạy trong SQL Editor của Supabase)`}
                     </pre>
                     <button onClick={copySql} className="absolute top-4 right-4 p-4 bg-slate-900/80 border border-white/5 rounded-xl text-slate-400 hover:text-white transition-all shadow-2xl flex items-center gap-2 font-black uppercase text-[10px]">
                        {sqlCopied ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
@@ -505,7 +499,6 @@ CREATE TABLE IF NOT EXISTS public.users_data (
         )}
       </div>
 
-      {/* MODALS CẢI TIẾN */}
       {showModal && (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6 animate-in fade-in duration-300">
            <div className="absolute inset-0 bg-black/90 backdrop-blur-xl" onClick={() => setShowModal(null)}></div>

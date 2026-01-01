@@ -16,30 +16,34 @@ import {
   ExternalLink,
   ChevronRight,
   History,
-  Check
+  Check,
+  MessageCircle,
+  ShieldAlert,
+  ArrowLeft,
+  Key
 } from 'lucide-react';
 
 interface Props {
   onLoginSuccess: (user: User) => void;
 }
 
-const MASCOT_URL = "https://cdn-icons-png.flaticon.com/512/3069/3069153.png";
-
 const Login: React.FC<Props> = ({ onLoginSuccess }) => {
-  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+  const [authMode, setAuthMode] = useState<'login' | 'signup' | 'forgot'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [referralCode, setReferralCode] = useState('');
+  const [resetCode, setResetCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [totalUsersCount, setTotalUsersCount] = useState(0);
   const [ads, setAds] = useState<AdBanner[]>([]);
   const [currentAdIdx, setCurrentAdIdx] = useState(0);
+  const [isResetStep2, setIsResetStep2] = useState(false);
 
   useEffect(() => {
-    // Tự động điền email nếu đã lưu
     const savedEmail = localStorage.getItem('nova_remember_email');
     if (savedEmail) {
       setEmail(savedEmail);
@@ -56,7 +60,6 @@ const Login: React.FC<Props> = ({ onLoginSuccess }) => {
     dbService.getAds(false).then(res => setAds(res.filter(a => a.isActive)));
   }, []);
 
-  // Xử lý chuyển đổi quảng cáo tự động
   useEffect(() => {
     if (ads.length <= 1) return;
     const interval = setInterval(() => {
@@ -94,9 +97,36 @@ const Login: React.FC<Props> = ({ onLoginSuccess }) => {
     }
   };
 
+  const handleForgotStep1 = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) return setError('Hãy nhập email của bạn.');
+    const res = await dbService.requestResetCode(email);
+    if (res.success) {
+      setIsResetStep2(true);
+      setError('');
+      setSuccessMsg(res.message);
+    } else {
+      setError(res.message);
+    }
+  };
+
+  const handleForgotStep2 = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetCode || !newPassword) return setError('Vui lòng nhập mã và mật khẩu mới.');
+    const res = await dbService.resetPassword(email, resetCode, newPassword);
+    if (res.success) {
+      setAuthMode('login');
+      setIsResetStep2(false);
+      setResetCode('');
+      setNewPassword('');
+      setSuccessMsg('Mật khẩu đã được thay đổi thành công!');
+    } else {
+      setError(res.message);
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 md:p-10">
-      {/* Background decoration */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-600/5 blur-[120px] rounded-full"></div>
         <div className="absolute bottom-[-10%] left-[-10%] w-[50%] h-[50%] bg-indigo-600/5 blur-[120px] rounded-full"></div>
@@ -104,7 +134,6 @@ const Login: React.FC<Props> = ({ onLoginSuccess }) => {
 
       <div className="w-full max-w-6xl glass-card rounded-[3rem] overflow-hidden flex flex-col lg:flex-row shadow-2xl relative z-10 border border-white/5">
         
-        {/* CỘT 1: QUẢNG CÁO & THÔNG TIN (Dành cho Desktop) */}
         <div className="hidden lg:flex lg:w-1/2 bg-[#0a0f1e]/40 flex-col p-16 relative overflow-hidden border-r border-white/5">
           <div className="absolute inset-0 bg-gradient-to-br from-blue-600/5 to-transparent"></div>
           
@@ -128,7 +157,6 @@ const Login: React.FC<Props> = ({ onLoginSuccess }) => {
               </p>
             </div>
 
-            {/* Banner Quảng cáo động */}
             <div className="flex-1 flex flex-col justify-center">
               {ads.length > 0 ? (
                 <div className="relative group overflow-hidden rounded-[2.5rem] border border-white/10 shadow-2xl animate-in fade-in duration-700">
@@ -144,7 +172,6 @@ const Login: React.FC<Props> = ({ onLoginSuccess }) => {
                       Xem ngay <ChevronRight size={14} />
                     </a>
                   </div>
-                  {/* Dots indicator */}
                   <div className="absolute top-4 right-4 flex gap-1">
                     {ads.map((_, i) => (
                       <div key={i} className={`w-1.5 h-1.5 rounded-full transition-all ${i === currentAdIdx ? 'bg-blue-500 w-4' : 'bg-white/20'}`}></div>
@@ -177,92 +204,162 @@ const Login: React.FC<Props> = ({ onLoginSuccess }) => {
           </div>
         </div>
 
-        {/* CỘT 2: AUTHENTICATION FORM */}
-        <div className="w-full lg:w-1/2 p-10 md:p-20 flex flex-col justify-center bg-black/40">
+        <div className="w-full lg:w-1/2 p-10 md:p-20 flex flex-col justify-center bg-black/40 relative">
           <div className="max-w-sm mx-auto w-full space-y-10">
             <div className="text-center lg:text-left space-y-2">
               <h2 className="text-3xl font-black text-white uppercase italic tracking-tighter">
-                {authMode === 'login' ? 'ĐĂNG NHẬP' : 'GIA NHẬP'}
+                {authMode === 'login' ? 'ĐĂNG NHẬP' : authMode === 'signup' ? 'GIA NHẬP' : 'KHÔI PHỤC'}
               </h2>
               <p className="text-slate-500 text-[9px] font-black uppercase tracking-[0.2em] italic">Hệ thống bảo mật Diamond Cloud Sync</p>
             </div>
 
-            <form onSubmit={authMode === 'login' ? handleLogin : handleSignup} className="space-y-4">
-              {authMode === 'signup' && (
+            {authMode === 'forgot' ? (
+              <form onSubmit={isResetStep2 ? handleForgotStep2 : handleForgotStep1} className="space-y-4">
+                 {!isResetStep2 ? (
+                   <>
+                     <div className="bg-blue-500/10 border border-blue-500/20 p-5 rounded-2xl space-y-3">
+                        <div className="flex items-center gap-3">
+                           <MessageCircle className="w-5 h-5 text-blue-400" />
+                           <span className="text-[10px] font-black text-white uppercase italic">XÁC THỰC TELEGRAM</span>
+                        </div>
+                        <p className="text-[10px] text-slate-400 font-medium italic">Để khôi phục, mã sẽ được gửi tới Bot Telegram đã liên kết với Gmail của bạn.</p>
+                     </div>
+                     <div className="relative group">
+                       <Mail className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 group-focus-within:text-blue-500 transition-colors" />
+                       <input 
+                         type="email" 
+                         value={email} 
+                         onChange={e => setEmail(e.target.value)} 
+                         placeholder="NHẬP GMAIL CỦA BẠN" 
+                         className="w-full bg-slate-900/50 border border-slate-800 rounded-2xl pl-14 pr-6 py-4 text-white font-black outline-none focus:border-blue-600 transition-all text-[11px] tracking-wider" 
+                       />
+                     </div>
+                     <button className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-2xl shadow-xl shadow-blue-600/20 uppercase tracking-[0.2em] transition-all active:scale-95 flex items-center justify-center gap-3 italic text-[11px]">
+                       <span>NHẬN MÃ XÁC MINH</span>
+                       <ArrowRight size={16} />
+                     </button>
+                   </>
+                 ) : (
+                   <>
+                     <div className="bg-emerald-500/10 border border-emerald-500/20 p-5 rounded-2xl space-y-3">
+                        <div className="flex items-center gap-3 text-emerald-400">
+                           <Key className="w-5 h-5" />
+                           <span className="text-[10px] font-black uppercase italic">MÃ ĐÃ ĐƯỢC GỬI</span>
+                        </div>
+                        <p className="text-[10px] text-slate-400 font-medium italic">Vui lòng kiểm tra tin nhắn từ @DiamondNovaBot trên Telegram.</p>
+                     </div>
+                     <div className="relative group">
+                       <ShieldCheck className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 group-focus-within:text-blue-500 transition-colors" />
+                       <input 
+                         type="text" 
+                         value={resetCode} 
+                         onChange={e => setResetCode(e.target.value)} 
+                         placeholder="NHẬP MÃ XÁC MINH" 
+                         className="w-full bg-slate-900/50 border border-slate-800 rounded-2xl pl-14 pr-6 py-4 text-white font-black outline-none focus:border-blue-600 transition-all text-[11px] tracking-widest text-center" 
+                       />
+                     </div>
+                     <div className="relative group">
+                       <Lock className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 group-focus-within:text-blue-500 transition-colors" />
+                       <input 
+                         type="password" 
+                         value={newPassword} 
+                         onChange={e => setNewPassword(e.target.value)} 
+                         placeholder="MẬT KHẨU MỚI" 
+                         className="w-full bg-slate-900/50 border border-slate-800 rounded-2xl pl-14 pr-6 py-4 text-white font-black outline-none focus:border-blue-600 transition-all text-[11px] tracking-wider" 
+                       />
+                     </div>
+                     <button className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-4 rounded-2xl shadow-xl shadow-emerald-600/20 uppercase tracking-[0.2em] transition-all active:scale-95 flex items-center justify-center gap-3 italic text-[11px]">
+                       <span>ĐỔI MẬT KHẨU MỚI</span>
+                       <Check size={16} />
+                     </button>
+                     <button type="button" onClick={() => setIsResetStep2(false)} className="w-full text-[9px] font-black text-slate-500 uppercase italic hover:text-white transition-colors">Thử lại email khác</button>
+                   </>
+                 )}
+                 <button type="button" onClick={() => setAuthMode('login')} className="w-full flex items-center justify-center gap-2 text-slate-500 hover:text-white transition-all">
+                    <ArrowLeft size={14} />
+                    <span className="text-[9px] font-black uppercase italic tracking-widest">QUAY LẠI ĐĂNG NHẬP</span>
+                 </button>
+              </form>
+            ) : (
+              <form onSubmit={authMode === 'login' ? handleLogin : handleSignup} className="space-y-4">
+                {authMode === 'signup' && (
+                  <div className="relative group">
+                    <UserCircle className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 group-focus-within:text-blue-500 transition-colors" />
+                    <input 
+                      type="text" 
+                      value={name} 
+                      onChange={e => setName(e.target.value)} 
+                      placeholder="HỌ TÊN THẬT (IN HOA)" 
+                      className="w-full bg-slate-900/50 border border-slate-800 rounded-2xl pl-14 pr-6 py-4 text-white font-black uppercase italic outline-none focus:border-blue-600 transition-all text-[11px] tracking-wider" 
+                    />
+                  </div>
+                )}
                 <div className="relative group">
-                  <UserCircle className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 group-focus-within:text-blue-500 transition-colors" />
+                  <Mail className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 group-focus-within:text-blue-500 transition-colors" />
                   <input 
-                    type="text" 
-                    value={name} 
-                    onChange={e => setName(e.target.value)} 
-                    placeholder="HỌ TÊN THẬT (IN HOA)" 
-                    className="w-full bg-slate-900/50 border border-slate-800 rounded-2xl pl-14 pr-6 py-4 text-white font-black uppercase italic outline-none focus:border-blue-600 transition-all text-[11px] tracking-wider" 
+                    type="email" 
+                    value={email} 
+                    onChange={e => setEmail(e.target.value)} 
+                    placeholder="ĐỊA CHỈ EMAIL" 
+                    className="w-full bg-slate-900/50 border border-slate-800 rounded-2xl pl-14 pr-6 py-4 text-white font-bold outline-none focus:border-blue-600 transition-all text-[11px] tracking-wider" 
                   />
                 </div>
-              )}
-              <div className="relative group">
-                <Mail className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 group-focus-within:text-blue-500 transition-colors" />
-                <input 
-                  type="email" 
-                  value={email} 
-                  onChange={e => setEmail(e.target.value)} 
-                  placeholder="ĐỊA CHỈ EMAIL" 
-                  className="w-full bg-slate-900/50 border border-slate-800 rounded-2xl pl-14 pr-6 py-4 text-white font-bold outline-none focus:border-blue-600 transition-all text-[11px] tracking-wider" 
-                />
-              </div>
-              <div className="relative group">
-                <Lock className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 group-focus-within:text-blue-500 transition-colors" />
-                <input 
-                  type="password" 
-                  value={password} 
-                  onChange={e => setPassword(e.target.value)} 
-                  placeholder="MẬT KHẨU" 
-                  className="w-full bg-slate-900/50 border border-slate-800 rounded-2xl pl-14 pr-6 py-4 text-white font-bold outline-none focus:border-blue-600 transition-all text-[11px] tracking-wider" 
-                />
-              </div>
-
-              {authMode === 'signup' && (
                 <div className="relative group">
-                  <KeyRound className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 group-focus-within:text-blue-500 transition-colors" />
+                  <Lock className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 group-focus-within:text-blue-500 transition-colors" />
                   <input 
-                    type="text" 
-                    value={referralCode} 
-                    onChange={e => setReferralCode(e.target.value.toUpperCase())} 
-                    placeholder="MÃ GIỚI THIỆU (NẾU CÓ)" 
-                    className="w-full bg-slate-900/50 border border-slate-800 rounded-2xl pl-14 pr-6 py-4 text-white font-bold outline-none focus:border-blue-600 transition-all text-[11px] uppercase tracking-widest" 
+                    type="password" 
+                    value={password} 
+                    onChange={e => setPassword(e.target.value)} 
+                    placeholder="MẬT KHẨU" 
+                    className="w-full bg-slate-900/50 border border-slate-800 rounded-2xl pl-14 pr-6 py-4 text-white font-bold outline-none focus:border-blue-600 transition-all text-[11px] tracking-wider" 
                   />
                 </div>
-              )}
 
-              {authMode === 'login' && (
-                <div className="flex items-center justify-between px-2 py-2">
-                  <button type="button" onClick={() => setRememberMe(!rememberMe)} className="flex items-center gap-3 group">
-                    <div className={`w-5 h-5 rounded-md border transition-all flex items-center justify-center ${rememberMe ? 'bg-blue-600 border-blue-500' : 'border-slate-800 bg-slate-950'}`}>
-                      {rememberMe && <Check size={12} className="text-white" />}
-                    </div>
-                    <span className="text-[10px] font-black text-slate-500 uppercase italic group-hover:text-slate-300 transition-colors">Lưu thông tin</span>
-                  </button>
-                  <button type="button" className="text-[10px] font-black text-blue-500 uppercase italic hover:text-blue-400 transition-colors">Quên mật khẩu?</button>
-                </div>
-              )}
+                {authMode === 'signup' && (
+                  <div className="relative group">
+                    <KeyRound className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 group-focus-within:text-blue-500 transition-colors" />
+                    <input 
+                      type="text" 
+                      value={referralCode} 
+                      onChange={e => setReferralCode(e.target.value.toUpperCase())} 
+                      placeholder="MÃ GIỚI THIỆU (NẾU CÓ)" 
+                      className="w-full bg-slate-900/50 border border-slate-800 rounded-2xl pl-14 pr-6 py-4 text-white font-bold outline-none focus:border-blue-600 transition-all text-[11px] uppercase tracking-widest" 
+                    />
+                  </div>
+                )}
 
-              {error && <div className="text-red-500 text-[10px] font-black uppercase tracking-widest bg-red-500/10 p-4 rounded-xl text-center border border-red-500/10">{error}</div>}
-              {successMsg && <div className="text-emerald-500 text-[10px] font-black uppercase tracking-widest bg-emerald-500/10 p-4 rounded-xl text-center border border-emerald-500/10">{successMsg}</div>}
+                {authMode === 'login' && (
+                  <div className="flex items-center justify-between px-2 py-2">
+                    <button type="button" onClick={() => setRememberMe(!rememberMe)} className="flex items-center gap-3 group">
+                      <div className={`w-5 h-5 rounded-md border transition-all flex items-center justify-center ${rememberMe ? 'bg-blue-600 border-blue-500' : 'border-slate-800 bg-slate-950'}`}>
+                        {rememberMe && <Check size={12} className="text-white" />}
+                      </div>
+                      <span className="text-[10px] font-black text-slate-500 uppercase italic group-hover:text-slate-300 transition-colors">Lưu thông tin</span>
+                    </button>
+                    <button type="button" onClick={() => setAuthMode('forgot')} className="text-[10px] font-black text-blue-500 uppercase italic hover:text-blue-400 transition-colors">Quên mật khẩu?</button>
+                  </div>
+                )}
 
-              <button className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-2xl shadow-xl shadow-blue-600/20 uppercase tracking-[0.2em] transition-all active:scale-95 flex items-center justify-center gap-3 group mt-4 italic text-[11px]">
-                <span>{authMode === 'login' ? 'TIẾP TỤC ĐĂNG NHẬP' : 'XÁC THỰC TÀI KHOẢN'}</span>
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </button>
-            </form>
+                <button className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-2xl shadow-xl shadow-blue-600/20 uppercase tracking-[0.2em] transition-all active:scale-95 flex items-center justify-center gap-3 group mt-4 italic text-[11px]">
+                  <span>{authMode === 'login' ? 'TIẾP TỤC ĐĂNG NHẬP' : 'XÁC THỰC TÀI KHOẢN'}</span>
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </button>
+              </form>
+            )}
 
-            <div className="text-center pt-6">
-              <button 
-                onClick={() => { setAuthMode(authMode === 'login' ? 'signup' : 'login'); setError(''); setSuccessMsg(''); }} 
-                className="text-slate-600 text-[10px] font-black hover:text-blue-400 uppercase tracking-widest transition-all italic underline-offset-4 hover:underline"
-              >
-                {authMode === 'login' ? 'CHƯA CÓ TÀI KHOẢN? ĐĂNG KÝ NGAY' : 'ĐÃ CÓ TÀI KHOẢN? ĐĂNG NHẬP'}
-              </button>
-            </div>
+            {error && <div className="text-red-500 text-[10px] font-black uppercase tracking-widest bg-red-500/10 p-4 rounded-xl text-center border border-red-500/10 animate-shake">{error}</div>}
+            {successMsg && <div className="text-emerald-500 text-[10px] font-black uppercase tracking-widest bg-emerald-500/10 p-4 rounded-xl text-center border border-emerald-500/10">{successMsg}</div>}
+
+            {authMode !== 'forgot' && (
+              <div className="text-center pt-6">
+                <button 
+                  onClick={() => { setAuthMode(authMode === 'login' ? 'signup' : 'login'); setError(''); setSuccessMsg(''); }} 
+                  className="text-slate-600 text-[10px] font-black hover:text-blue-400 uppercase tracking-widest transition-all italic underline-offset-4 hover:underline"
+                >
+                  {authMode === 'login' ? 'CHƯA CÓ TÀI KHOẢN? ĐĂNG KÝ NGAY' : 'ĐÃ CÓ TÀI KHOẢN? ĐĂNG NHẬP'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -275,6 +372,15 @@ const Login: React.FC<Props> = ({ onLoginSuccess }) => {
         <div className="w-1 h-1 bg-slate-700 rounded-full"></div>
         <span className="text-[9px] font-black text-white uppercase tracking-widest italic">© 2025 HOANGMAIANHVU-DEV-BOT-WEB</span>
       </div>
+      
+      <style>{`
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-5px); }
+          75% { transform: translateX(5px); }
+        }
+        .animate-shake { animation: shake 0.3s ease-in-out; }
+      `}</style>
     </div>
   );
 };

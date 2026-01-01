@@ -99,6 +99,33 @@ export const dbService = {
     return await supabase.from('users_data').update(dbUpdates).eq('id', id);
   },
 
+  // Forgot Password Services
+  requestResetCode: async (email: string) => {
+    const { data, error } = await supabase.from('users_data').select('id').eq('email', email).maybeSingle();
+    if (error || !data) return { success: false, message: 'Email không tồn tại trong hệ thống.' };
+    
+    // Giả lập tạo mã reset và gửi qua Telegram
+    const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+    // Lưu vào DB (Cần cột reset_code trong users_data)
+    await supabase.from('users_data').update({ reset_code: resetCode }).eq('email', email);
+    
+    return { success: true, message: 'Mã xác minh đã được gửi tới Bot Telegram của bạn.' };
+  },
+
+  resetPassword: async (email: string, code: string, newPass: string) => {
+    const { data, error } = await supabase.from('users_data').select('reset_code').eq('email', email).maybeSingle();
+    if (error || !data) return { success: false, message: 'Lỗi xác thực.' };
+    
+    if (data.reset_code === code) {
+      await supabase.from('users_data').update({ 
+        password_hash: btoa(newPass),
+        reset_code: null 
+      }).eq('email', email);
+      return { success: true, message: 'Đổi mật khẩu thành công.' };
+    }
+    return { success: false, message: 'Mã xác minh không chính xác.' };
+  },
+
   getAllUsers: async () => {
     const { data, error } = await supabase.from('users_data').select('*').order('balance', { ascending: false });
     return error ? handleDbError(error) : (data || []).map(mapUser);

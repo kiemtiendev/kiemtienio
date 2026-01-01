@@ -1,3 +1,4 @@
+
 import React, { useMemo, useEffect, useState, useRef } from 'react';
 import { User, AppView, Announcement, AdBanner, AdminNotification } from '../types.ts';
 import { dbService } from '../services/dbService.ts';
@@ -16,7 +17,9 @@ import {
   History,
   Info,
   Bot,
-  Sparkles
+  Sparkles,
+  ChevronRight,
+  ChevronLeft
 } from 'lucide-react';
 
 interface Props {
@@ -62,6 +65,7 @@ const StatCard: React.FC<{
 const Dashboard: React.FC<Props> = ({ user, setView }) => {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [ads, setAds] = useState<AdBanner[]>([]);
+  const [currentAdIdx, setCurrentAdIdx] = useState(0);
   const [personalNotifications, setPersonalNotifications] = useState<AdminNotification[]>([]);
 
   useEffect(() => {
@@ -75,6 +79,14 @@ const Dashboard: React.FC<Props> = ({ user, setView }) => {
     };
     fetchData();
   }, [user.id]);
+
+  useEffect(() => {
+    if (ads.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentAdIdx(prev => (prev + 1) % ads.length);
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [ads]);
 
   const latestAnnouncement = announcements[0];
   
@@ -110,6 +122,42 @@ const Dashboard: React.FC<Props> = ({ user, setView }) => {
           <button onClick={() => setView(AppView.LEADERBOARD)} className="p-4 bg-slate-900 border border-white/5 rounded-2xl hover:bg-slate-800 transition-all text-amber-500 shadow-xl active:scale-95"><Trophy className="w-6 h-6" /></button>
         </div>
       </div>
+
+      {/* Ads Section in Dashboard */}
+      {ads.length > 0 && (
+        <div className="relative group overflow-hidden rounded-[2.5rem] border border-white/5 shadow-2xl animate-in zoom-in-95 duration-500">
+           <div className="absolute inset-0 bg-blue-600/5 animate-pulse"></div>
+           <img 
+             src={ads[currentAdIdx].imageUrl} 
+             alt={ads[currentAdIdx].title}
+             className="w-full aspect-[21/9] md:aspect-[3/1] object-cover transition-transform duration-1000 group-hover:scale-105"
+           />
+           <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent flex flex-col justify-end p-6 md:p-12">
+              <div className="flex items-center gap-2 mb-2">
+                 <span className="px-2 py-0.5 bg-blue-600 text-white text-[8px] font-black rounded italic">HỆ THỐNG ĐỀ XUẤT</span>
+                 <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest italic">Tài trợ bởi Nova Ads</span>
+              </div>
+              <h3 className="text-xl md:text-3xl font-black text-white italic uppercase tracking-tight mb-4">{ads[currentAdIdx].title}</h3>
+              <a 
+                href={ads[currentAdIdx].targetUrl} 
+                target="_blank" 
+                className="w-fit flex items-center gap-3 px-6 py-3 bg-white text-black rounded-xl font-black text-[10px] uppercase italic tracking-widest hover:bg-blue-500 hover:text-white transition-all shadow-xl"
+              >
+                KHÁM PHÁ NGAY <ArrowRight className="w-4 h-4" />
+              </a>
+           </div>
+           
+           <div className="absolute bottom-4 right-8 flex gap-1.5">
+             {ads.map((_, i) => (
+               <div 
+                 key={i} 
+                 onClick={() => setCurrentAdIdx(i)}
+                 className={`w-2 h-2 rounded-full cursor-pointer transition-all ${i === currentAdIdx ? 'bg-blue-500 w-6' : 'bg-white/20'}`}
+               ></div>
+             ))}
+           </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {latestAnnouncement && (
