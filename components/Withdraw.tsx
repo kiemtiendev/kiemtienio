@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { User, WithdrawalRequest } from '../types.ts';
 import { WITHDRAW_MILESTONES, RATE_VND_TO_POINT, formatK, POINT_PER_DIAMOND } from '../constants.tsx';
 import { dbService } from '../services/dbService.ts';
-import { Building2, Gamepad2, Wallet, CheckCircle, Loader2, History } from 'lucide-react';
+import { Building2, Gamepad2, Wallet, CheckCircle, Loader2, History, ArrowRightLeft } from 'lucide-react';
 
 interface Props {
   user: User;
@@ -38,7 +38,6 @@ const Withdraw: React.FC<Props> = ({ user, onUpdateUser, initialHistory = false 
     
     setIsProcessing(true);
     setTimeout(() => {
-      // ID sẽ được dbService tự động gán theo định dạng 000000X
       const request: WithdrawalRequest = {
         id: '', 
         userId: user.id,
@@ -87,7 +86,9 @@ const Withdraw: React.FC<Props> = ({ user, onUpdateUser, initialHistory = false 
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest bg-blue-500/10 px-2 py-0.5 rounded">ID: #{req.id}</span>
                     </div>
-                    <h4 className="font-black text-xl text-white uppercase italic tracking-tight">{formatK(req.amount * RATE_VND_TO_POINT)} {req.type === 'game' && <span className="text-purple-400 text-sm ml-2">({getGameDiamondValue(req.amount)} KC)</span>}</h4>
+                    <h4 className="font-black text-xl text-white uppercase italic tracking-tight">
+                      {req.type === 'bank' ? `${req.amount.toLocaleString()}đ` : `${getGameDiamondValue(req.amount)} KC`}
+                    </h4>
                     <span className="text-[10px] text-slate-500 font-black uppercase tracking-widest">{new Date(req.createdAt).toLocaleString('vi-VN')}</span>
                   </div>
                 </div>
@@ -106,24 +107,36 @@ const Withdraw: React.FC<Props> = ({ user, onUpdateUser, initialHistory = false 
     <div className="space-y-10 animate-in fade-in duration-500 max-w-5xl mx-auto pb-20">
       <div className="flex flex-col gap-4">
         <h1 className="text-5xl font-black text-white uppercase italic tracking-tighter leading-none drop-shadow-xl">THANH KHOẢN NOVA</h1>
-        <p className="text-slate-500 font-bold uppercase text-xs tracking-[0.2em] italic">Rút tối thiểu từ {formatK(5000 * RATE_VND_TO_POINT)} P (5k VNĐ)</p>
+        <div className="flex items-center gap-3">
+          <div className="bg-blue-600/20 p-1.5 rounded-lg border border-blue-500/30">
+            <ArrowRightLeft className="w-4 h-4 text-blue-400" />
+          </div>
+          <p className="text-slate-400 font-black uppercase text-xs tracking-[0.2em] italic">
+            Tỷ giá: <span className="text-blue-400">5.000đ = 50.000 P</span> (10x Points)
+          </p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <button onClick={() => setMethod('bank')} className={`glass-card p-12 rounded-[3.5rem] border-4 transition-all shadow-xl flex flex-col items-center text-center gap-4 group ${method === 'bank' ? 'border-blue-500 bg-blue-500/10' : 'border-transparent hover:border-slate-800'}`}>
+        <button onClick={() => { setMethod('bank'); setSelectedMilestone(null); }} className={`glass-card p-12 rounded-[3.5rem] border-4 transition-all shadow-xl flex flex-col items-center text-center gap-4 group ${method === 'bank' ? 'border-blue-500 bg-blue-500/10' : 'border-transparent hover:border-slate-800'}`}>
           <div className="p-6 bg-blue-600/10 rounded-3xl group-hover:scale-110 transition-transform"><Building2 className="w-12 h-12 text-blue-400" /></div>
           <h3 className="text-3xl font-black text-white uppercase italic tracking-tighter">Rút ATM/VND</h3>
-          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">1 VNĐ = 10 Điểm</p>
+          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest italic">Nhận tiền mặt qua STK</p>
         </button>
-        <button onClick={() => setMethod('game')} className={`glass-card p-12 rounded-[3.5rem] border-4 transition-all shadow-xl flex flex-col items-center text-center gap-4 group ${method === 'game' ? 'border-purple-500 bg-purple-500/10' : 'border-transparent hover:border-slate-800'}`}>
+        <button onClick={() => { setMethod('game'); setSelectedMilestone(null); }} className={`glass-card p-12 rounded-[3.5rem] border-4 transition-all shadow-xl flex flex-col items-center text-center gap-4 group ${method === 'game' ? 'border-purple-500 bg-purple-500/10' : 'border-transparent hover:border-slate-800'}`}>
           <div className="p-6 bg-purple-600/10 rounded-3xl group-hover:scale-110 transition-transform"><Gamepad2 className="w-12 h-12 text-purple-400" /></div>
           <h3 className="text-3xl font-black text-white uppercase italic tracking-tighter">Kim Cương FF</h3>
-          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">50k P = 25 KC</p>
+          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest italic">Nạp trực tiếp qua ID Game</p>
         </button>
       </div>
 
       {method && (
         <div className="glass-card p-10 md:p-14 rounded-[4rem] space-y-12 bg-slate-900/20 backdrop-blur-3xl shadow-2xl border border-white/5 animate-in slide-in-from-bottom-6">
+          <div className="text-center">
+            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.5em] mb-4 italic">CHỌN HẠN MỨC QUY ĐỔI</h4>
+            <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent w-full"></div>
+          </div>
+
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
             {WITHDRAW_MILESTONES.map(val => {
               const pts = val * RATE_VND_TO_POINT;
@@ -134,29 +147,44 @@ const Withdraw: React.FC<Props> = ({ user, onUpdateUser, initialHistory = false 
                   key={val} 
                   disabled={isLow} 
                   onClick={() => setSelectedMilestone(val)} 
-                  className={`p-8 rounded-[2rem] border-2 transition-all flex flex-col items-center gap-2 shadow-lg active:scale-95 ${isSelected ? 'border-emerald-500 bg-emerald-500/10' : 'border-slate-800 bg-slate-950/50 hover:border-slate-700'} ${isLow ? 'opacity-20 grayscale' : ''}`}
+                  className={`p-8 rounded-[2rem] border-2 transition-all flex flex-col items-center gap-2 shadow-lg active:scale-95 group relative overflow-hidden ${isSelected ? 'border-emerald-500 bg-emerald-500/10' : 'border-slate-800 bg-slate-950/50 hover:border-slate-700'} ${isLow ? 'opacity-20 grayscale cursor-not-allowed' : ''}`}
                 >
-                  <span className="text-2xl font-black text-white italic tracking-tighter">{method === 'game' ? `${getGameDiamondValue(val)} KC` : formatK(val * RATE_VND_TO_POINT)}</span>
-                  <span className="text-[10px] text-slate-500 font-black uppercase italic tracking-widest">{formatK(pts)} ĐIỂM</span>
+                  <span className={`text-2xl font-black italic tracking-tighter transition-colors ${isSelected ? 'text-emerald-400' : 'text-white'}`}>
+                    {method === 'game' ? `${getGameDiamondValue(val)} KC` : `${(val/1000).toFixed(0)}k VNĐ`}
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-black uppercase italic tracking-widest group-hover:text-slate-400 transition-colors">
+                    {pts.toLocaleString()} P
+                  </span>
+                  {isSelected && <div className="absolute top-2 right-2 w-2 h-2 bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,1)] animate-pulse"></div>}
                 </button>
               );
             })}
           </div>
           
-          <div className="relative group">
-            <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
-            <button 
-              onClick={handleWithdraw} 
-              disabled={!selectedMilestone || !canAfford || isProcessing} 
-              className="relative w-full bg-slate-950 hover:bg-black text-white font-black py-7 rounded-2xl uppercase tracking-[0.2em] italic transition-all disabled:opacity-40 shadow-2xl border border-white/10"
-            >
-              {isProcessing ? <Loader2 className="animate-spin w-6 h-6 mx-auto" /> : (
-                <div className="flex items-center justify-center gap-3">
-                  <Wallet className="w-6 h-6 text-emerald-500" />
-                  <span>XÁC NHẬN RÚT THƯỞNG</span>
-                </div>
-              )}
-            </button>
+          <div className="space-y-6">
+            <div className="flex items-center justify-between px-6">
+               <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest italic">Số dư: <span className="text-white">{user.balance.toLocaleString()} P</span></span>
+               <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest italic">Yêu cầu: <span className={canAfford ? 'text-emerald-500' : 'text-red-500'}>{pointsNeeded.toLocaleString()} P</span></span>
+            </div>
+
+            <div className="relative group">
+              <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
+              <button 
+                onClick={handleWithdraw} 
+                disabled={!selectedMilestone || !canAfford || isProcessing} 
+                className="relative w-full bg-slate-950 hover:bg-black text-white font-black py-7 rounded-2xl uppercase tracking-[0.2em] italic transition-all disabled:opacity-40 shadow-2xl border border-white/10"
+              >
+                {isProcessing ? <Loader2 className="animate-spin w-6 h-6 mx-auto" /> : (
+                  <div className="flex items-center justify-center gap-3">
+                    <Wallet className="w-6 h-6 text-emerald-500" />
+                    <span>XÁC NHẬN RÚT THƯỞNG</span>
+                  </div>
+                )}
+              </button>
+            </div>
+            {!canAfford && selectedMilestone && (
+              <p className="text-center text-[10px] text-red-500 font-black uppercase italic tracking-widest animate-pulse">Bạn không đủ điểm để thực hiện lệnh rút này.</p>
+            )}
           </div>
         </div>
       )}
@@ -169,7 +197,7 @@ const Withdraw: React.FC<Props> = ({ user, onUpdateUser, initialHistory = false 
                  <CheckCircle className="w-10 h-10 text-emerald-500" />
               </div>
               <h2 className="text-3xl font-black text-white uppercase italic mb-4">THÀNH CÔNG!</h2>
-              <p className="text-slate-400 font-medium italic mb-4">Yêu cầu của bạn đã được gửi tới Admin. Vui lòng đợi 5-30 phút để xử lý.</p>
+              <p className="text-slate-400 font-medium italic mb-4">Yêu cầu rút {selectedMilestone?.toLocaleString()}đ ({pointsNeeded.toLocaleString()} P) đã được gửi. Vui lòng đợi 5-30 phút.</p>
               <button onClick={() => setIsSuccess(false)} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-5 rounded-2xl uppercase tracking-widest italic transition-all">OK, TÔI ĐÃ HIỂU</button>
            </div>
         </div>

@@ -1,6 +1,6 @@
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,10 +9,10 @@
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Load Babel Standalone (Để biên dịch TSX ngay trên trình duyệt) -->
+    <!-- Load Babel Standalone để biên dịch TSX ngay trên trình duyệt -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
-    <!-- ES Module Shims: Cho phép import module với transpilation động -->
+    <!-- ES Module Shims: Trái tim của hệ thống No-Build -->
     <script async src="https://ga.jspm.io/npm:es-module-shims@1.10.0/dist/es-module-shims.js"></script>
     
     <script type="esms-options">
@@ -22,14 +22,13 @@
     </script>
 
     <script>
-      // Hook can thiệp vào quá trình nạp file của trình duyệt
+      // Hook can thiệp vào quá trình Fetch để biên dịch file .ts/.tsx sang .js với MIME type đúng
       window.esmsInitOptions = {
         shimMode: true,
         fetch: async (url, options) => {
           const res = await fetch(url, options);
           if (!res.ok) return res;
           
-          // Tự động phát hiện và biên dịch các file TypeScript/React
           if (url.endsWith('.tsx') || url.endsWith('.ts')) {
             const source = await res.text();
             try {
@@ -41,12 +40,11 @@
                 filename: url
               }).code;
               
-              // Sửa lỗi MIME type bằng cách trả về application/javascript
               return new Response(transformed, {
                 headers: { 'content-type': 'application/javascript' }
               });
             } catch (err) {
-              console.error('Babel Transform Error at ' + url, err);
+              console.error('Lỗi biên dịch Babel tại: ' + url, err);
             }
           }
           return res;
@@ -78,33 +76,9 @@
         100% { transform: translateY(0px) rotate(0deg); }
       }
       .float-animation { animation: float 6s ease-in-out infinite; }
-      
-      /* Marquee Animation */
-      @keyframes marquee {
-        0% { transform: translateX(100%); }
-        100% { transform: translateX(-100%); }
-      }
-      .animate-marquee {
-        animation: marquee 35s linear infinite;
-      }
-      
-      /* Scrollbar */
-      ::-webkit-scrollbar {
-        width: 6px;
-      }
-      ::-webkit-scrollbar-track {
-        background: transparent;
-      }
-      ::-webkit-scrollbar-thumb {
-        background: rgba(59, 130, 246, 0.2);
-        border-radius: 10px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: rgba(59, 130, 246, 0.4);
-      }
     </style>
 
-    <!-- Import Map dành cho es-module-shims -->
+    <!-- Import Map cho các thư viện external dùng shim-mode -->
     <script type="importmap-shim">
     {
       "imports": {
@@ -132,11 +106,10 @@
     <div id="root"></div>
 
     <script>
-      // Định nghĩa process.env giả lập cho trình duyệt
       window.process = { env: { API_KEY: "" } };
     </script>
 
-    <!-- Load entry point chính thức -->
+    <!-- Load entry point index.tsx nằm cùng cấp với index.html -->
     <script type="module-shim" src="./index.tsx"></script>
 </body>
 </html>

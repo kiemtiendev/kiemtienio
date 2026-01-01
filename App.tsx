@@ -6,10 +6,12 @@ import { NAV_ITEMS } from './constants.tsx';
 import { 
   Menu, 
   LogOut, 
-  Sparkles 
+  Sparkles,
+  Bot,
+  MessageSquareText
 } from 'lucide-react';
 
-// Components - Tất cả phải có đuôi file rõ ràng
+// Components - Tất cả import từ thư mục gốc/components
 import Login from './components/Login.tsx';
 import Dashboard from './components/Dashboard.tsx';
 import Tasks from './components/Tasks.tsx';
@@ -21,6 +23,7 @@ import Referral from './components/Referral.tsx';
 import Admin from './components/Admin.tsx';
 import Guide from './components/Guide.tsx';
 import UserNotifications from './components/UserNotifications.tsx';
+import Support from './components/Support.tsx';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -63,7 +66,7 @@ const App: React.FC = () => {
     );
   }
 
-  // Nếu chưa đăng nhập, render Login ngay lập tức (Luồng ưu tiên)
+  // Luồng ưu tiên: Render Login nếu chưa có session
   if (!user) {
     return <Login onLoginSuccess={handleLoginSuccess} />;
   }
@@ -82,6 +85,7 @@ const App: React.FC = () => {
       case AppView.ADMIN: return user.isAdmin ? <Admin user={user} onUpdateUser={updateUser} /> : <Dashboard user={user} setView={setCurrentView} />;
       case AppView.GUIDE: return <Guide />;
       case AppView.NOTIFICATIONS: return <UserNotifications user={user} />;
+      case AppView.SUPPORT: return <Support />;
       default: return <Dashboard user={user} setView={setCurrentView} />;
     }
   };
@@ -146,6 +150,17 @@ const App: React.FC = () => {
             © 2025 DIAMOND NOVA • VISION 1.0
           </div>
         </div>
+
+        {/* Floating AI Bubble */}
+        <button 
+          onClick={() => setCurrentView(AppView.SUPPORT)}
+          className={`fixed bottom-10 right-10 w-16 h-16 rounded-full bg-gradient-to-br from-violet-600 to-indigo-800 text-white flex items-center justify-center shadow-[0_0_30px_rgba(99,102,241,0.5)] border-2 border-white/20 transition-all hover:scale-110 active:scale-90 group z-[60] ${currentView === AppView.SUPPORT ? 'hidden' : 'flex'}`}
+        >
+          <Bot className="w-8 h-8 group-hover:animate-bounce" />
+          <div className="absolute right-full mr-4 bg-slate-900 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest italic whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none border border-white/10 shadow-2xl">
+             Hỏi AI Gemini ✨
+          </div>
+        </button>
       </main>
 
       {isSidebarOpen && <div className="fixed inset-0 z-40 bg-black/80 backdrop-blur-md md:hidden" onClick={() => setIsSidebarOpen(false)}></div>}

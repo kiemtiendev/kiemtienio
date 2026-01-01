@@ -15,7 +15,9 @@ import {
   Trophy, 
   ArrowRight,
   History,
-  Info
+  Info,
+  Bot,
+  Sparkles
 } from 'lucide-react';
 
 interface Props {
@@ -131,30 +133,45 @@ const Dashboard: React.FC<Props> = ({ user, setView }) => {
         </div>
       </div>
 
-      {latestAnnouncement && (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* Latest Announcement */}
+        {latestAnnouncement && (
+          <div 
+            onClick={() => setView(AppView.NOTIFICATIONS)}
+            className="glass-card p-8 md:p-10 rounded-[3.5rem] border border-blue-500/20 bg-gradient-to-r from-blue-600/10 to-transparent flex items-center gap-8 group cursor-pointer hover:bg-white/[0.05] transition-all shadow-2xl relative overflow-hidden h-full"
+          >
+            <div className="w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center shadow-lg shadow-blue-600/30 shrink-0">
+               <Bell className="w-10 h-10 text-white animate-bounce" />
+            </div>
+            <div className="flex-1">
+               <div className="flex items-center gap-3 mb-2">
+                 <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.3em] italic">TIN TỨC QUAN TRỌNG</span>
+                 <span className="px-2 py-0.5 bg-red-600 text-white text-[8px] font-black rounded italic">NEW</span>
+               </div>
+               <h3 className="text-2xl font-black text-white uppercase italic tracking-tighter mb-2 line-clamp-1">{latestAnnouncement.title}</h3>
+               <p className="text-slate-400 text-sm font-medium italic line-clamp-1">{latestAnnouncement.content}</p>
+            </div>
+          </div>
+        )}
+
+        {/* AI Assistant Quick Card */}
         <div 
-          onClick={() => setView(AppView.NOTIFICATIONS)}
-          className="glass-card p-8 md:p-10 rounded-[3.5rem] border border-blue-500/20 bg-gradient-to-r from-blue-600/10 to-transparent flex flex-col md:flex-row items-center gap-8 group cursor-pointer hover:bg-white/[0.05] transition-all shadow-2xl relative overflow-hidden"
+          onClick={() => setView(AppView.SUPPORT)}
+          className="glass-card p-8 md:p-10 rounded-[3.5rem] border border-violet-500/20 bg-gradient-to-r from-violet-600/10 to-transparent flex items-center gap-8 group cursor-pointer hover:bg-white/[0.05] transition-all shadow-2xl relative overflow-hidden h-full"
         >
-          <div className="absolute top-0 right-0 p-8 opacity-5">
-            <Bell className="w-32 h-32 text-blue-500" />
+          <div className="w-20 h-20 bg-violet-600 rounded-3xl flex items-center justify-center shadow-lg shadow-violet-600/30 shrink-0">
+             <Bot className="w-10 h-10 text-white group-hover:scale-110 transition-transform" />
           </div>
-          <div className="w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center shadow-lg shadow-blue-600/30 shrink-0">
-             <Bell className="w-10 h-10 text-white animate-bounce" />
-          </div>
-          <div className="flex-1 text-center md:text-left">
-             <div className="flex items-center justify-center md:justify-start gap-3 mb-2">
-               <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.3em] italic">TIN TỨC QUAN TRỌNG</span>
-               <span className="px-2 py-0.5 bg-red-600 text-white text-[8px] font-black rounded italic">NEW</span>
+          <div className="flex-1">
+             <div className="flex items-center gap-3 mb-2">
+               <span className="text-[10px] font-black text-violet-400 uppercase tracking-[0.3em] italic">TRỢ LÝ THÔNG MINH</span>
+               <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
              </div>
-             <h3 className="text-2xl font-black text-white uppercase italic tracking-tighter mb-2 line-clamp-1">{latestAnnouncement.title}</h3>
-             <p className="text-slate-400 text-sm font-medium italic line-clamp-1">{latestAnnouncement.content}</p>
-          </div>
-          <div className="shrink-0 flex items-center gap-2 text-blue-500 font-black text-xs uppercase italic group-hover:translate-x-3 transition-transform">
-             XEM CHI TIẾT <ArrowRight className="w-5 h-5" />
+             <h3 className="text-2xl font-black text-white uppercase italic tracking-tighter mb-2">HỎI AI GEMINI 3.0</h3>
+             <p className="text-slate-400 text-sm font-medium italic">Hỗ trợ 24/7 về nạp, rút và nhiệm vụ</p>
           </div>
         </div>
-      )}
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-10">
         <StatCard 

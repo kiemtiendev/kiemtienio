@@ -16,7 +16,8 @@ import {
   Building2,
   Gamepad2,
   Clock,
-  ShieldAlert
+  ShieldAlert,
+  ArrowRightLeft
 } from 'lucide-react';
 import { SOCIAL_LINKS, WITHDRAW_MILESTONES, RATE_VND_TO_POINT, formatK } from '../constants.tsx';
 
@@ -85,7 +86,12 @@ const Guide: React.FC = () => {
             <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter flex items-center justify-center gap-4">
                <Wallet className="w-10 h-10 text-emerald-500" /> HƯỚNG DẪN RÚT THƯỞNG
             </h2>
-            <p className="text-slate-400 text-sm font-black uppercase tracking-widest italic">Quy đổi điểm (P) thành giá trị thực chỉ trong vài phút</p>
+            <div className="flex items-center justify-center gap-3">
+               <div className="bg-emerald-600/20 p-1 rounded-lg border border-emerald-500/30">
+                 <ArrowRightLeft className="w-4 h-4 text-emerald-400" />
+               </div>
+               <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest italic">Tỷ lệ quy đổi: <span className="text-white">1 VNĐ = 10 P</span> (Ví dụ: 5.000 VNĐ = 50.000 P)</p>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
@@ -95,7 +101,7 @@ const Guide: React.FC = () => {
                  <div className="p-4 bg-emerald-600/20 rounded-2xl text-emerald-400 border border-emerald-500/20"><Building2 className="w-8 h-8" /></div>
                  <div>
                    <h4 className="text-xl font-black text-white uppercase italic tracking-tighter">RÚT TIỀN ATM / VND</h4>
-                   <span className="text-[10px] font-bold text-slate-500">Tỷ lệ: 10 P = 1 VND</span>
+                   <span className="text-[10px] font-bold text-slate-500">Quy đổi: 5.000đ = 50.000 P</span>
                  </div>
               </div>
               <ul className="space-y-4">
@@ -105,7 +111,7 @@ const Guide: React.FC = () => {
                 </li>
                 <li className="flex gap-3 text-sm text-slate-400 font-medium italic">
                   <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
-                  Mức rút tối thiểu: <b className="text-white">{formatK(minPoints)} P</b> ({minWithdrawVND.toLocaleString()}đ).
+                  Mức rút tối thiểu: <b className="text-white">50.000 P</b> (5.000đ).
                 </li>
                 <li className="flex gap-3 text-sm text-slate-400 font-medium italic">
                   <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />

@@ -14,7 +14,8 @@ import {
   Cloud,
   Coins,
   Users,
-  Bell
+  Bell,
+  Bot
 } from 'lucide-react';
 import { AppView, TaskGate } from './types.ts';
 
@@ -57,6 +58,7 @@ export const NAV_ITEMS = [
   { id: AppView.TASKS, label: 'Bắt đầu nhiệm vụ', icon: <Coins /> },
   { id: AppView.WITHDRAW, label: 'Rút Thưởng', icon: <CreditCard /> },
   { id: AppView.HISTORY, label: 'Lịch sử rút', icon: <History /> },
+  { id: AppView.SUPPORT, label: 'Trợ lý AI Gemini', icon: <Bot /> },
   { id: AppView.NOTIFICATIONS, label: 'Thông báo', icon: <Bell /> },
   { id: AppView.GIFTCODE, label: 'Nhập Giftcode', icon: <Ticket /> },
   { id: AppView.LEADERBOARD, label: 'Bảng Xếp Hạng', icon: <Trophy /> },

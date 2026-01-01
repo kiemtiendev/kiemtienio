@@ -10,7 +10,8 @@ export enum AppView {
   REFERRAL = 'referral',
   ADMIN = 'admin',
   GUIDE = 'guide',
-  NOTIFICATIONS = 'notifications'
+  NOTIFICATIONS = 'notifications',
+  SUPPORT = 'support'
 }
 
 export interface ActivityLog {
