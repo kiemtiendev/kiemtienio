@@ -50,8 +50,8 @@ const Admin: React.FC<Props> = ({ user }) => {
       setAnnouncements(a);
       setAds(adsData);
       setLogs(l);
-    } catch (err) {
-      console.error("Sync error:", err);
+    } catch (err: any) {
+      console.error("Sync error:", err?.message || err);
     } finally {
       setIsSyncing(false);
     }
@@ -80,7 +80,7 @@ const Admin: React.FC<Props> = ({ user }) => {
       setShowModal(null);
       refreshData();
     } catch (err: any) {
-      alert("Lỗi khi tạo quảng cáo. Hãy đảm bảo bạn đã chạy mã SQL ở Tab Hệ Thống.");
+      alert("Lỗi khi tạo quảng cáo: " + (err?.message || "Lỗi hệ thống. Đảm bảo bạn đã chạy SQL Setup."));
     }
   };
 
@@ -105,7 +105,7 @@ const Admin: React.FC<Props> = ({ user }) => {
       setShowModal(null);
       refreshData();
     } catch (err: any) {
-      alert("Lỗi khi tạo thông báo. Hãy đảm bảo bảng 'announcements' đã sẵn sàng.");
+      alert("Lỗi khi tạo thông báo: " + (err?.message || "Lỗi hệ thống. Đảm bảo bạn đã chạy SQL Setup."));
     }
   };
 
@@ -130,7 +130,7 @@ const Admin: React.FC<Props> = ({ user }) => {
       setShowModal(null);
       refreshData();
     } catch (err: any) {
-      alert("Lỗi khi tạo Giftcode. Hãy đảm bảo bảng 'giftcodes' đã sẵn sàng.");
+      alert("Lỗi khi tạo Giftcode: " + (err?.message || "Lỗi hệ thống. Đảm bảo bạn đã chạy SQL Setup."));
     }
   };
 
@@ -147,34 +147,31 @@ const Admin: React.FC<Props> = ({ user }) => {
   };
 
   const copySql = () => {
-    const sql = `-- MÃ KHỞI TẠO DATABASE DIAMOND NOVA (FULL STABLE)
-ALTER TABLE public.users_data ADD COLUMN IF NOT EXISTS reset_code TEXT;
-ALTER TABLE public.announcements ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
-ALTER TABLE public.giftcodes ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
-ALTER TABLE public.ads ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+    const sql = `-- MÃ KHỞI TẠO VÀ SỬA LỖI DATABASE DIAMOND NOVA (FULL REPAIR)
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
+-- 1. Bảng Dữ liệu người dùng
 CREATE TABLE IF NOT EXISTS public.users_data (
     id TEXT PRIMARY KEY,
-    admin_id TEXT,
     email TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     fullname TEXT NOT NULL,
     balance NUMERIC DEFAULT 0,
-    points NUMERIC DEFAULT 0,
     total_earned NUMERIC DEFAULT 0,
+    tasks_today INTEGER DEFAULT 0,
+    tasks_week INTEGER DEFAULT 0,
     is_admin BOOLEAN DEFAULT false,
     is_banned BOOLEAN DEFAULT false,
     join_date TIMESTAMPTZ DEFAULT NOW(),
     last_task_date TIMESTAMPTZ,
-    referred_by TEXT,
     bank_info TEXT DEFAULT '',
     id_game TEXT DEFAULT '',
     task_counts JSONB DEFAULT '{}'::jsonb,
     referral_count INTEGER DEFAULT 0,
-    referral_bonus NUMERIC DEFAULT 0,
     reset_code TEXT
 );
 
+-- 2. Bảng Yêu cầu rút tiền
 CREATE TABLE IF NOT EXISTS public.withdrawals (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id TEXT REFERENCES public.users_data(id),
@@ -186,14 +183,17 @@ CREATE TABLE IF NOT EXISTS public.withdrawals (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 3. Bảng Quảng cáo Banner
 CREATE TABLE IF NOT EXISTS public.ads (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     title TEXT,
     image_url TEXT,
     target_url TEXT,
-    is_active BOOLEAN DEFAULT true
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 4. Bảng Thông báo hệ thống
 CREATE TABLE IF NOT EXISTS public.announcements (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     title TEXT,
@@ -203,6 +203,7 @@ CREATE TABLE IF NOT EXISTS public.announcements (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 5. Bảng Giftcodes
 CREATE TABLE IF NOT EXISTS public.giftcodes (
     code TEXT PRIMARY KEY,
     amount NUMERIC,
@@ -212,17 +213,7 @@ CREATE TABLE IF NOT EXISTS public.giftcodes (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS public.notifications (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    type TEXT,
-    title TEXT,
-    content TEXT,
-    user_id TEXT DEFAULT 'all',
-    user_name TEXT DEFAULT 'System',
-    is_read BOOLEAN DEFAULT false,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
+-- 6. Nhật ký hoạt động
 CREATE TABLE IF NOT EXISTS public.activity_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id TEXT,
@@ -232,12 +223,28 @@ CREATE TABLE IF NOT EXISTS public.activity_logs (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- REPAIR: TỰ ĐỘNG THÊM CỘT BỊ THIẾU VÀO CÁC BẢNG HIỆN CÓ
+ALTER TABLE public.users_data ADD COLUMN IF NOT EXISTS reset_code TEXT;
+ALTER TABLE public.users_data ADD COLUMN IF NOT EXISTS tasks_today INTEGER DEFAULT 0;
+ALTER TABLE public.users_data ADD COLUMN IF NOT EXISTS tasks_week INTEGER DEFAULT 0;
+
+ALTER TABLE public.ads ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.ads ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+
+ALTER TABLE public.announcements ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.announcements ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+
+ALTER TABLE public.giftcodes ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.giftcodes ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+
+ALTER TABLE public.withdrawals ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+
+-- Tắt RLS để Prototype hoạt động mượt mà
 ALTER TABLE public.users_data DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.withdrawals DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ads DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.announcements DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.giftcodes DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.notifications DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.activity_logs DISABLE ROW LEVEL SECURITY;`;
     navigator.clipboard.writeText(sql);
     setSqlCopied(true);
@@ -256,7 +263,7 @@ ALTER TABLE public.activity_logs DISABLE ROW LEVEL SECURITY;`;
           <div className="p-4 bg-blue-600 rounded-2xl shadow-xl shadow-blue-600/20"><ShieldCheck className="w-8 h-8 text-white" /></div>
           <div>
             <h1 className="text-3xl font-black text-white italic uppercase tracking-tighter">NOVA ADMIN</h1>
-            <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest italic mt-1">Hệ thống quản trị Vision 1.0</p>
+            <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest italic mt-1">Hệ thống quản trị Vision 1.1</p>
           </div>
         </div>
         <button onClick={refreshData} className="px-6 py-3 bg-slate-900 border border-white/5 rounded-xl text-[10px] font-black uppercase text-white hover:bg-slate-800 flex items-center gap-2 transition-all">
@@ -477,17 +484,90 @@ ALTER TABLE public.activity_logs DISABLE ROW LEVEL SECURITY;`;
               <div className="p-10 rounded-[3rem] border border-blue-500/20 bg-blue-500/5 space-y-6">
                  <div className="flex items-center gap-4 text-amber-500">
                     <AlertTriangle className="w-8 h-8" />
-                    <h4 className="text-xl font-black text-white italic uppercase">CÀI ĐẶT DATABASE SUPABASE</h4>
+                    <h4 className="text-xl font-black text-white italic uppercase">CÀI ĐẶT DATABASE SUPABASE (SỬA LỖI COLUMN)</h4>
                  </div>
-                 <p className="text-slate-400 text-sm font-medium italic leading-relaxed">Sử dụng đoạn mã này để đồng bộ mọi bảng cần thiết cho hệ thống.</p>
+                 <p className="text-slate-400 text-sm font-medium italic leading-relaxed">Sử dụng đoạn mã này để sửa lỗi thiếu cột 'created_at', 'tasks_today' và đồng bộ mọi bảng cần thiết.</p>
                  <div className="relative group">
                     <pre className="w-full bg-black/80 border border-slate-800 rounded-2xl p-8 text-blue-400 font-mono text-[10px] overflow-x-auto max-h-72 italic">
-                       {`ALTER TABLE public.users_data ADD COLUMN IF NOT EXISTS reset_code TEXT;
-ALTER TABLE public.announcements ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
-ALTER TABLE public.giftcodes ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
-ALTER TABLE public.ads ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+                       {`CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
--- ... (Copy toàn bộ mã trong tab Setup và chạy trong SQL Editor của Supabase)`}
+-- Khởi tạo hoặc sửa bảng users_data
+CREATE TABLE IF NOT EXISTS public.users_data (
+    id TEXT PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    fullname TEXT NOT NULL,
+    balance NUMERIC DEFAULT 0,
+    total_earned NUMERIC DEFAULT 0,
+    tasks_today INTEGER DEFAULT 0,
+    tasks_week INTEGER DEFAULT 0,
+    is_admin BOOLEAN DEFAULT false,
+    is_banned BOOLEAN DEFAULT false,
+    join_date TIMESTAMPTZ DEFAULT NOW(),
+    last_task_date TIMESTAMPTZ,
+    bank_info TEXT DEFAULT '',
+    id_game TEXT DEFAULT '',
+    task_counts JSONB DEFAULT '{}'::jsonb,
+    referral_count INTEGER DEFAULT 0,
+    reset_code TEXT
+);
+
+-- Bảng withdrawals
+CREATE TABLE IF NOT EXISTS public.withdrawals (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id TEXT REFERENCES public.users_data(id),
+    user_name TEXT,
+    amount NUMERIC,
+    type TEXT,
+    status TEXT DEFAULT 'pending',
+    details TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Bảng ads (Khắc phục lỗi thiếu created_at)
+CREATE TABLE IF NOT EXISTS public.ads (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title TEXT,
+    image_url TEXT,
+    target_url TEXT,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Bảng announcements
+CREATE TABLE IF NOT EXISTS public.announcements (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title TEXT,
+    content TEXT,
+    priority TEXT DEFAULT 'low',
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Bảng giftcodes
+CREATE TABLE IF NOT EXISTS public.giftcodes (
+    code TEXT PRIMARY KEY,
+    amount NUMERIC,
+    max_uses INTEGER,
+    used_by JSONB DEFAULT '[]'::jsonb,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- CẬP NHẬT CỘT CHO CÁC BẢNG ĐÃ TỒN TẠI
+ALTER TABLE public.users_data ADD COLUMN IF NOT EXISTS tasks_today INTEGER DEFAULT 0;
+ALTER TABLE public.users_data ADD COLUMN IF NOT EXISTS tasks_week INTEGER DEFAULT 0;
+ALTER TABLE public.ads ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.ads ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+ALTER TABLE public.announcements ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.giftcodes ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+
+-- Tắt RLS
+ALTER TABLE public.users_data DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.withdrawals DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ads DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.announcements DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.giftcodes DISABLE ROW LEVEL SECURITY;`}
                     </pre>
                     <button onClick={copySql} className="absolute top-4 right-4 p-4 bg-slate-900/80 border border-white/5 rounded-xl text-slate-400 hover:text-white transition-all shadow-2xl flex items-center gap-2 font-black uppercase text-[10px]">
                        {sqlCopied ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
@@ -512,19 +592,10 @@ ALTER TABLE public.ads ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
                       <h3 className="text-2xl font-black text-white italic uppercase tracking-tighter text-center">TẠO QUẢNG CÁO</h3>
                    </div>
                    <div className="space-y-4">
-                      <div className="space-y-1.5">
-                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 italic">Tiêu đề Banner</label>
-                        <input type="text" placeholder="Nhập tiêu đề..." value={newAd.title} onChange={e => setNewAd({...newAd, title: e.target.value})} className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-5 py-4 text-white font-bold outline-none focus:border-blue-500 transition-all" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 italic">URL Hình ảnh</label>
-                        <input type="text" placeholder="https://..." value={newAd.imageUrl} onChange={e => setNewAd({...newAd, imageUrl: e.target.value})} className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-5 py-4 text-white font-bold outline-none focus:border-blue-500 transition-all" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 italic">Link đích (Target)</label>
-                        <input type="text" placeholder="https://..." value={newAd.targetUrl} onChange={e => setNewAd({...newAd, targetUrl: e.target.value})} className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-5 py-4 text-white font-bold outline-none focus:border-blue-500 transition-all" />
-                      </div>
-                      <button onClick={handleAddAd} className="w-full bg-blue-600 py-5 rounded-2xl font-black text-white uppercase italic tracking-widest shadow-xl hover:brightness-110 active:scale-95 transition-all mt-4">KÍCH HOẠT QUẢNG CÁO</button>
+                      <input type="text" placeholder="Tiêu đề Banner" value={newAd.title} onChange={e => setNewAd({...newAd, title: e.target.value})} className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-5 py-4 text-white outline-none focus:border-blue-500 transition-all" />
+                      <input type="text" placeholder="URL Hình ảnh" value={newAd.imageUrl} onChange={e => setNewAd({...newAd, imageUrl: e.target.value})} className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-5 py-4 text-white outline-none focus:border-blue-500 transition-all" />
+                      <input type="text" placeholder="Link đích" value={newAd.targetUrl} onChange={e => setNewAd({...newAd, targetUrl: e.target.value})} className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-5 py-4 text-white outline-none focus:border-blue-500 transition-all" />
+                      <button onClick={handleAddAd} className="w-full bg-blue-600 py-5 rounded-2xl font-black text-white uppercase italic tracking-widest shadow-xl transition-all mt-4">KÍCH HOẠT QUẢNG CÁO</button>
                    </div>
                 </div>
               )}
@@ -536,15 +607,9 @@ ALTER TABLE public.ads ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
                       <h3 className="text-2xl font-black text-white italic uppercase tracking-tighter text-center">THÔNG BÁO MỚI</h3>
                    </div>
                    <div className="space-y-4">
-                      <div className="space-y-1.5">
-                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 italic">Tiêu đề bản tin</label>
-                        <input type="text" placeholder="Nhập tiêu đề..." value={newAnn.title} onChange={e => setNewAnn({...newAnn, title: e.target.value})} className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-5 py-4 text-white font-bold outline-none focus:border-amber-500 transition-all" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 italic">Nội dung chi tiết</label>
-                        <textarea placeholder="Nội dung thông báo..." value={newAnn.content} onChange={e => setNewAnn({...newAnn, content: e.target.value})} rows={4} className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-5 py-4 text-white font-bold outline-none focus:border-amber-500 transition-all resize-none" />
-                      </div>
-                      <button onClick={handleAddAnn} className="w-full bg-amber-600 py-5 rounded-2xl font-black text-white uppercase italic tracking-widest shadow-xl hover:brightness-110 active:scale-95 transition-all mt-4">PHÁT HÀNH TIN</button>
+                      <input type="text" placeholder="Tiêu đề bản tin" value={newAnn.title} onChange={e => setNewAnn({...newAnn, title: e.target.value})} className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-5 py-4 text-white font-bold outline-none focus:border-amber-500 transition-all" />
+                      <textarea placeholder="Nội dung thông báo..." value={newAnn.content} onChange={e => setNewAnn({...newAnn, content: e.target.value})} rows={4} className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-5 py-4 text-white font-bold outline-none focus:border-amber-500 transition-all resize-none" />
+                      <button onClick={handleAddAnn} className="w-full bg-amber-600 py-5 rounded-2xl font-black text-white uppercase italic tracking-widest shadow-xl transition-all mt-4">PHÁT HÀNH TIN</button>
                    </div>
                 </div>
               )}
@@ -556,32 +621,18 @@ ALTER TABLE public.ads ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
                       <h3 className="text-2xl font-black text-white italic uppercase tracking-tighter text-center">TẠO GIFTCODE</h3>
                    </div>
                    <div className="space-y-4">
-                      <div className="space-y-1.5">
-                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 italic">Mã Code (In hoa)</label>
-                        <input type="text" placeholder="VD: NOVA100K" value={newGc.code} onChange={e => setNewGc({...newGc, code: e.target.value.toUpperCase()})} className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-5 py-4 text-white font-black italic tracking-widest outline-none focus:border-rose-500 transition-all" />
-                      </div>
+                      <input type="text" placeholder="Mã Code (In hoa)" value={newGc.code} onChange={e => setNewGc({...newGc, code: e.target.value.toUpperCase()})} className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-5 py-4 text-white font-black italic tracking-widest outline-none focus:border-rose-500 transition-all" />
                       <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                          <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 italic">Số điểm tặng</label>
-                          <input type="number" value={newGc.amount} onChange={e => setNewGc({...newGc, amount: parseInt(e.target.value)})} className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-5 py-4 text-white font-bold outline-none focus:border-rose-500 transition-all" />
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 italic">Lượt nhập</label>
-                          <input type="number" value={newGc.maxUses} onChange={e => setNewGc({...newGc, maxUses: parseInt(e.target.value)})} className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-5 py-4 text-white font-bold outline-none focus:border-rose-500 transition-all" />
-                        </div>
+                        <input type="number" placeholder="Điểm tặng" value={newGc.amount} onChange={e => setNewGc({...newGc, amount: parseInt(e.target.value)})} className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-5 py-4 text-white font-bold outline-none focus:border-rose-500 transition-all" />
+                        <input type="number" placeholder="Lượt nhập" value={newGc.maxUses} onChange={e => setNewGc({...newGc, maxUses: parseInt(e.target.value)})} className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-5 py-4 text-white font-bold outline-none focus:border-rose-500 transition-all" />
                       </div>
-                      <button onClick={handleAddGc} className="w-full bg-rose-600 py-5 rounded-2xl font-black text-white uppercase italic tracking-widest shadow-xl hover:brightness-110 active:scale-95 transition-all mt-4">LƯU MÃ QUÀ TẶNG</button>
+                      <button onClick={handleAddGc} className="w-full bg-rose-600 py-5 rounded-2xl font-black text-white uppercase italic tracking-widest shadow-xl transition-all mt-4">LƯU MÃ QUÀ TẶNG</button>
                    </div>
                 </div>
               )}
            </div>
         </div>
       )}
-
-      <style>{`
-        .shadow-3xl { box-shadow: 0 40px 100px -20px rgba(0,0,0,0.8); }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-      `}</style>
     </div>
   );
 };

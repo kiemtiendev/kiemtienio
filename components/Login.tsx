@@ -20,7 +20,8 @@ import {
   MessageCircle,
   ShieldAlert,
   ArrowLeft,
-  Key
+  Key,
+  Send
 } from 'lucide-react';
 
 interface Props {
@@ -32,6 +33,7 @@ const Login: React.FC<Props> = ({ onLoginSuccess }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [telegramId, setTelegramId] = useState(''); // New state for Telegram ID
   const [referralCode, setReferralCode] = useState('');
   const [resetCode, setResetCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -99,8 +101,8 @@ const Login: React.FC<Props> = ({ onLoginSuccess }) => {
 
   const handleForgotStep1 = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) return setError('Hãy nhập email của bạn.');
-    const res = await dbService.requestResetCode(email);
+    if (!email || !telegramId) return setError('Vui lòng nhập đầy đủ Email và Telegram ID.');
+    const res = await dbService.requestResetCode(email, telegramId);
     if (res.success) {
       setIsResetStep2(true);
       setError('');
@@ -222,7 +224,7 @@ const Login: React.FC<Props> = ({ onLoginSuccess }) => {
                            <MessageCircle className="w-5 h-5 text-blue-400" />
                            <span className="text-[10px] font-black text-white uppercase italic">XÁC THỰC TELEGRAM</span>
                         </div>
-                        <p className="text-[10px] text-slate-400 font-medium italic">Để khôi phục, mã sẽ được gửi tới Bot Telegram đã liên kết với Gmail của bạn.</p>
+                        <p className="text-[10px] text-slate-400 font-medium italic leading-relaxed">Để khôi phục, vui lòng nhập Gmail và Telegram ID của bạn để nhận mã xác minh.</p>
                      </div>
                      <div className="relative group">
                        <Mail className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 group-focus-within:text-blue-500 transition-colors" />
@@ -230,12 +232,22 @@ const Login: React.FC<Props> = ({ onLoginSuccess }) => {
                          type="email" 
                          value={email} 
                          onChange={e => setEmail(e.target.value)} 
-                         placeholder="NHẬP GMAIL CỦA BẠN" 
+                         placeholder="ĐỊA CHỈ GMAIL" 
+                         className="w-full bg-slate-900/50 border border-slate-800 rounded-2xl pl-14 pr-6 py-4 text-white font-black outline-none focus:border-blue-600 transition-all text-[11px] tracking-wider" 
+                       />
+                     </div>
+                     <div className="relative group">
+                       <Send className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 group-focus-within:text-blue-500 transition-colors" />
+                       <input 
+                         type="text" 
+                         value={telegramId} 
+                         onChange={e => setTelegramId(e.target.value)} 
+                         placeholder="ID TELEGRAM (VÍ DỤ: 12345678)" 
                          className="w-full bg-slate-900/50 border border-slate-800 rounded-2xl pl-14 pr-6 py-4 text-white font-black outline-none focus:border-blue-600 transition-all text-[11px] tracking-wider" 
                        />
                      </div>
                      <button className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-2xl shadow-xl shadow-blue-600/20 uppercase tracking-[0.2em] transition-all active:scale-95 flex items-center justify-center gap-3 italic text-[11px]">
-                       <span>NHẬN MÃ XÁC MINH</span>
+                       <span>GỬI MÃ XÁC MINH</span>
                        <ArrowRight size={16} />
                      </button>
                    </>
@@ -244,9 +256,9 @@ const Login: React.FC<Props> = ({ onLoginSuccess }) => {
                      <div className="bg-emerald-500/10 border border-emerald-500/20 p-5 rounded-2xl space-y-3">
                         <div className="flex items-center gap-3 text-emerald-400">
                            <Key className="w-5 h-5" />
-                           <span className="text-[10px] font-black uppercase italic">MÃ ĐÃ ĐƯỢC GỬI</span>
+                           <span className="text-[10px] font-black uppercase italic">KIỂM TRA TIN NHẮN</span>
                         </div>
-                        <p className="text-[10px] text-slate-400 font-medium italic">Vui lòng kiểm tra tin nhắn từ @DiamondNovaBot trên Telegram.</p>
+                        <p className="text-[10px] text-slate-400 font-medium italic">Mã đã được gửi đến Telegram ID của bạn qua Bot Diamond Nova.</p>
                      </div>
                      <div className="relative group">
                        <ShieldCheck className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 group-focus-within:text-blue-500 transition-colors" />
@@ -269,10 +281,10 @@ const Login: React.FC<Props> = ({ onLoginSuccess }) => {
                        />
                      </div>
                      <button className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-4 rounded-2xl shadow-xl shadow-emerald-600/20 uppercase tracking-[0.2em] transition-all active:scale-95 flex items-center justify-center gap-3 italic text-[11px]">
-                       <span>ĐỔI MẬT KHẨU MỚI</span>
+                       <span>XÁC NHẬN ĐỔI MẬT KHẨU</span>
                        <Check size={16} />
                      </button>
-                     <button type="button" onClick={() => setIsResetStep2(false)} className="w-full text-[9px] font-black text-slate-500 uppercase italic hover:text-white transition-colors">Thử lại email khác</button>
+                     <button type="button" onClick={() => setIsResetStep2(false)} className="w-full text-[9px] font-black text-slate-500 uppercase italic hover:text-white transition-colors">Thử lại thông tin khác</button>
                    </>
                  )}
                  <button type="button" onClick={() => setAuthMode('login')} className="w-full flex items-center justify-center gap-2 text-slate-500 hover:text-white transition-all">

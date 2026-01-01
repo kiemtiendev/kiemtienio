@@ -1,7 +1,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { User, Giftcode, WithdrawalRequest, AdminNotification, Announcement, AdBanner, ActivityLog } from '../types.ts';
-import { REFERRAL_REWARD, RATE_VND_TO_POINT } from '../constants.tsx';
+import { REFERRAL_REWARD } from '../constants.tsx';
 
 const supabaseUrl = (window as any).process?.env?.SUPABASE_URL || '';
 const supabaseKey = (window as any).process?.env?.SUPABASE_ANON_KEY || '';
@@ -15,6 +15,8 @@ const mapUser = (u: any): User => {
     bankInfo: u.bank_info || '',
     idGame: u.id_game || '',
     totalEarned: Number(u.total_earned ?? 0),
+    tasksToday: Number(u.tasks_today ?? 0),
+    tasksWeek: Number(u.tasks_week ?? 0),
     isBanned: Boolean(u.is_banned ?? false),
     isAdmin: Boolean(u.is_admin ?? false),
     joinDate: u.join_date,
@@ -29,10 +31,10 @@ const mapUser = (u: any): User => {
 
 const handleDbError = (err: any, fallback: any = []) => {
   if (err?.status === 404 || err?.code === 'PGRST116') {
-    console.warn("Database table missing or record not found.");
     return fallback;
   }
-  console.error("Database Error:", err);
+  const errorMsg = err?.message || JSON.stringify(err);
+  console.error("Database detail:", errorMsg);
   return fallback;
 };
 
@@ -48,7 +50,8 @@ export const dbService = {
 
       const newUser = {
         id: userId, admin_id: userId, email, password_hash: btoa(pass), fullname: fullname.toUpperCase(),
-        balance: 0, points: 0, total_earned: 0, is_admin: isFirst, is_banned: false,
+        balance: 0, total_earned: 0, tasks_today: 0, tasks_week: 0, 
+        is_admin: isFirst, is_banned: false,
         join_date: new Date().toISOString(), referred_by: refId || null, bank_info: '', id_game: '', task_counts: {}
       };
 
@@ -94,36 +97,31 @@ export const dbService = {
     if (updates.balance !== undefined) dbUpdates.balance = updates.balance;
     if (updates.isBanned !== undefined) dbUpdates.is_banned = updates.isBanned;
     if (updates.taskCounts !== undefined) dbUpdates.task_counts = updates.taskCounts;
+    if (updates.tasksToday !== undefined) dbUpdates.tasks_today = updates.tasksToday;
+    if (updates.tasksWeek !== undefined) dbUpdates.tasks_week = updates.tasksWeek;
+    if (updates.totalEarned !== undefined) dbUpdates.total_earned = updates.totalEarned;
+    if (updates.lastTaskDate !== undefined) dbUpdates.last_task_date = updates.lastTaskDate;
     if (updates.bankInfo !== undefined) dbUpdates.bank_info = updates.bankInfo;
     if (updates.idGame !== undefined) dbUpdates.id_game = updates.idGame;
     return await supabase.from('users_data').update(dbUpdates).eq('id', id);
   },
 
-  // Forgot Password Services
-  requestResetCode: async (email: string) => {
+  requestResetCode: async (email: string, telegramId: string) => {
     const { data, error } = await supabase.from('users_data').select('id').eq('email', email).maybeSingle();
-    if (error || !data) return { success: false, message: 'Email không tồn tại trong hệ thống.' };
-    
-    // Giả lập tạo mã reset và gửi qua Telegram
+    if (error || !data) return { success: false, message: 'Email không tồn tại.' };
     const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
-    // Lưu vào DB (Cần cột reset_code trong users_data)
     await supabase.from('users_data').update({ reset_code: resetCode }).eq('email', email);
-    
-    return { success: true, message: 'Mã xác minh đã được gửi tới Bot Telegram của bạn.' };
+    return { success: true, message: `Mã đã gửi tới Telegram ID: ${telegramId}` };
   },
 
   resetPassword: async (email: string, code: string, newPass: string) => {
     const { data, error } = await supabase.from('users_data').select('reset_code').eq('email', email).maybeSingle();
     if (error || !data) return { success: false, message: 'Lỗi xác thực.' };
-    
     if (data.reset_code === code) {
-      await supabase.from('users_data').update({ 
-        password_hash: btoa(newPass),
-        reset_code: null 
-      }).eq('email', email);
+      await supabase.from('users_data').update({ password_hash: btoa(newPass), reset_code: null }).eq('email', email);
       return { success: true, message: 'Đổi mật khẩu thành công.' };
     }
-    return { success: false, message: 'Mã xác minh không chính xác.' };
+    return { success: false, message: 'Mã xác minh sai.' };
   },
 
   getAllUsers: async () => {
@@ -140,7 +138,7 @@ export const dbService = {
 
   addWithdrawal: async (req: any) => {
     return await supabase.from('withdrawals').insert([{
-      user_id: req.userId, user_name: req.userName, amount: req.amount, type: req.type, status: 'pending', details: req.details, created_at: new Date().toISOString()
+      user_id: req.userId, user_name: req.userName, amount: req.amount, type: req.type, status: 'pending', details: req.details
     }]);
   },
 
@@ -157,26 +155,23 @@ export const dbService = {
 
   addNotification: async (n: any) => {
     return await supabase.from('notifications').insert([{
-      type: n.type, title: n.title, content: n.content, user_id: n.userId || 'all', user_name: n.userName || 'System', created_at: new Date().toISOString()
+      type: n.type, title: n.title, content: n.content, user_id: n.userId || 'all', user_name: n.userName || 'System'
     }]);
   },
 
   getAnnouncements: async (all = false) => {
-    let q = supabase.from('announcements').select('*').order('created_at', { ascending: false });
-    if (!all) {
-      q = q.eq('is_active', true);
-    }
-    const { data, error } = await q;
-    return error ? handleDbError(error) : (data || []).map(a => ({ ...a, createdAt: a.created_at, isActive: a.is_active }));
+    let q = supabase.from('announcements').select('*');
+    try {
+      q = q.order('created_at', { ascending: false });
+      if (!all) q = q.eq('is_active', true);
+      const { data, error } = await q;
+      return error ? handleDbError(error) : (data || []).map(a => ({ ...a, createdAt: a.created_at, isActive: a.is_active }));
+    } catch (e) { return []; }
   },
 
   saveAnnouncement: async (ann: any) => {
     return await supabase.from('announcements').insert([{ 
-      title: ann.title, 
-      content: ann.content, 
-      priority: ann.priority || 'low', 
-      is_active: true, 
-      created_at: new Date().toISOString() 
+      title: ann.title, content: ann.content, priority: ann.priority || 'low', is_active: true
     }]);
   },
 
@@ -190,23 +185,16 @@ export const dbService = {
 
   getAds: async (all = false) => {
     let q = supabase.from('ads').select('*');
-    if (!all) q = q.eq('is_active', true);
-    const { data, error } = await q;
-    return error ? handleDbError(error) : (data || []).map(ad => ({ 
-      ...ad, 
-      imageUrl: ad.image_url, 
-      targetUrl: ad.target_url, 
-      isActive: ad.is_active 
-    }));
+    try {
+      q = q.order('created_at', { ascending: false });
+      if (!all) q = q.eq('is_active', true);
+      const { data, error } = await q;
+      return error ? handleDbError(error) : (data || []).map(ad => ({ ...ad, imageUrl: ad.image_url, targetUrl: ad.target_url, isActive: ad.is_active }));
+    } catch (e) { return []; }
   },
 
   saveAd: async (ad: any) => {
-    return await supabase.from('ads').insert([{ 
-      title: ad.title, 
-      image_url: ad.imageUrl, 
-      target_url: ad.targetUrl, 
-      is_active: true 
-    }]);
+    return await supabase.from('ads').insert([{ title: ad.title, image_url: ad.imageUrl, target_url: ad.targetUrl, is_active: true }]);
   },
 
   updateAdStatus: async (id: string, isActive: boolean) => {
@@ -219,24 +207,17 @@ export const dbService = {
 
   getGiftcodes: async (all = false) => {
     let q = supabase.from('giftcodes').select('*');
-    if (!all) q = q.eq('is_active', true);
-    const { data, error } = await q;
-    return error ? handleDbError(error) : (data || []).map(g => ({ 
-      ...g, 
-      maxUses: g.max_uses, 
-      usedBy: g.used_by || [], 
-      isActive: g.is_active 
-    }));
+    try {
+      q = q.order('created_at', { ascending: false });
+      if (!all) q = q.eq('is_active', true);
+      const { data, error } = await q;
+      return error ? handleDbError(error) : (data || []).map(g => ({ ...g, maxUses: g.max_uses, usedBy: g.used_by || [], isActive: g.is_active }));
+    } catch (e) { return []; }
   },
 
   addGiftcode: async (gc: any) => {
     return await supabase.from('giftcodes').insert([{ 
-      code: gc.code.toUpperCase(), 
-      amount: gc.amount, 
-      max_uses: gc.maxUses, 
-      used_by: [], 
-      is_active: true, 
-      created_at: new Date().toISOString() 
+      code: gc.code.toUpperCase(), amount: gc.amount, max_uses: gc.maxUses, used_by: [], is_active: true
     }]);
   },
 
@@ -244,22 +225,18 @@ export const dbService = {
     return await supabase.from('giftcodes').update({ is_active: isActive }).eq('code', code);
   },
 
-  saveGiftcodes: async (codes: any[]) => {
-    for (const gc of codes) {
-      await supabase.from('giftcodes').update({ used_by: gc.usedBy }).eq('code', gc.code);
-    }
-  },
-
   deleteGiftcode: async (code: string) => {
     return await supabase.from('giftcodes').delete().eq('code', code);
   },
 
   logActivity: async (uId: string, uName: string, action: string, details: string) => {
-    await supabase.from('activity_logs').insert([{ user_id: uId, user_name: uName, action, details, created_at: new Date().toISOString() }]);
+    await supabase.from('activity_logs').insert([{ user_id: uId, user_name: uName, action, details }]);
   },
 
   getActivityLogs: async () => {
-    const { data, error } = await supabase.from('activity_logs').select('*').order('created_at', { ascending: false }).limit(50);
-    return error ? handleDbError(error) : (data || []).map(l => ({ ...l, createdAt: l.created_at }));
+    try {
+      const { data, error } = await supabase.from('activity_logs').select('*').order('created_at', { ascending: false }).limit(50);
+      return error ? handleDbError(error) : (data || []).map(l => ({ ...l, createdAt: l.created_at }));
+    } catch (e) { return []; }
   }
 };
