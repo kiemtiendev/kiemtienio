@@ -147,7 +147,7 @@ const App: React.FC = () => {
           {renderView()}
           
           <div className="absolute bottom-[-4rem] right-0 text-[9px] font-black text-slate-700 uppercase tracking-widest italic">
-            © 2025 DIAMOND NOVA • VISION 1.0
+            © hoangmaianhvu-dev-bot-web • VISION 1.0
           </div>
         </div>
 

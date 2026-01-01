@@ -125,6 +125,7 @@ const Dashboard: React.FC<Props> = ({ user, setView }) => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
         <div>
           <h1 className="text-5xl md:text-6xl font-black text-white uppercase italic tracking-tighter leading-none drop-shadow-2xl nova-gradient">DIAMOND HUB</h1>
+          <p className="text-[9px] font-black text-blue-500/40 uppercase tracking-[0.5em] italic mt-2 ml-1">hoangmaianhvu-dev-bot-web</p>
           <p className="text-slate-500 font-bold text-xs uppercase tracking-widest mt-4">Xác nhận định danh: <span className="text-blue-400 italic font-black">{user.fullname}</span></p>
         </div>
         <div className="flex gap-4">

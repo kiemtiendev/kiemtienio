@@ -154,7 +154,7 @@ const Login: React.FC<Props> = ({ onLoginSuccess }) => {
               {successMsg && <div className="text-emerald-500 text-[10px] font-black uppercase tracking-widest bg-emerald-500/10 p-4 rounded-xl text-center border border-emerald-500/20">{successMsg}</div>}
 
               <button className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:brightness-110 text-white font-black py-5 rounded-2xl shadow-xl shadow-blue-600/30 uppercase tracking-[0.2em] transition-all active:scale-95 flex items-center justify-center gap-3 group mt-8 italic">
-                <span>{authMode === 'login' ? 'TIẾP TỤC ĐĂNG NHẬP' : 'XÁC NHẬN GIA NHẬP'}</span>
+                <span>{authMode === 'login' ? 'TIẾP TỤC ĐĂNG NHẬP' : 'XÁC THỰC GIA NHẬP'}</span>
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-2 transition-transform" />
               </button>
             </form>
@@ -175,6 +175,10 @@ const Login: React.FC<Props> = ({ onLoginSuccess }) => {
               <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Máy chủ</span>
               <span className="text-4xl font-black text-emerald-500 italic uppercase drop-shadow-[0_0_10px_rgba(16,185,129,0.3)]">ONLINE</span>
             </div>
+          </div>
+          
+          <div className="mt-12 opacity-30 text-[9px] font-black uppercase tracking-[0.3em] italic text-slate-500">
+             © hoangmaianhvu-dev-bot-web
           </div>
         </div>
       </main>
