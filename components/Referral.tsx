@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { User } from '../types';
-import { REFERRAL_REWARD, formatK } from '../constants';
+import { User } from '../types.ts';
+import { REFERRAL_REWARD, formatK } from '../constants.tsx';
 import { 
   Users, 
   Copy, 

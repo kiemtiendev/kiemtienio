@@ -18,7 +18,7 @@ import {
   Clock,
   ShieldAlert
 } from 'lucide-react';
-import { SOCIAL_LINKS, WITHDRAW_MILESTONES, RATE_VND_TO_POINT, formatK } from '../constants';
+import { SOCIAL_LINKS, WITHDRAW_MILESTONES, RATE_VND_TO_POINT, formatK } from '../constants.tsx';
 
 const Guide: React.FC = () => {
   const minWithdrawVND = Math.min(...WITHDRAW_MILESTONES);
@@ -204,7 +204,7 @@ const Guide: React.FC = () => {
          </a>
          <a href={SOCIAL_LINKS.TELEGRAM} target="_blank" className="flex-1 glass-card p-10 rounded-[3rem] border border-white/5 hover:bg-blue-600/5 hover:border-blue-600/30 transition-all flex items-center justify-between group">
             <div className="flex items-center gap-6">
-               <div className="p-5 bg-blue-600/10 rounded-2xl text-blue-400 border border-blue-500/20"><MessageCircle className="w-10 h-10" /></div>
+               <div className="p-5 bg-blue-600/10 rounded-2xl text-blue-400 border border-red-500/20"><MessageCircle className="w-10 h-10" /></div>
                <div>
                   <h4 className="text-xl font-black text-white uppercase italic tracking-tighter">THAM GIA CỘNG ĐỒNG</h4>
                   <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">Cập nhật thông tin & Event mới</p>

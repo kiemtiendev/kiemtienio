@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { dbService } from '../services/dbService';
-import { User } from '../types';
+import { dbService } from '../services/dbService.ts';
+import { User } from '../types.ts';
 import { 
   Sparkles, 
   X, 

@@ -39,7 +39,7 @@
                 filename: url
               }).code;
               
-              // Trả về Response với MIME Type hợp lệ để trình duyệt không chặn
+              // Trả về Response với MIME Type hợp lệ để trình duyệt không chặn (Sửa lỗi application/octet-stream)
               return new Response(transformed, {
                 headers: { 'content-type': 'application/javascript' }
               });
@@ -78,7 +78,7 @@
       .float-animation { animation: float 6s ease-in-out infinite; }
     </style>
 
-    <!-- Import Map cho các thư viện external -->
+    <!-- Import Map cho các thư viện external (Dùng shim-mode) -->
     <script type="importmap-shim">
     {
       "imports": {
