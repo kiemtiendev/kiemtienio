@@ -46,8 +46,8 @@ const App: React.FC = () => {
 
     // REAL-TIME: Lắng nghe thay đổi Database từ Supabase
     const userSubscription = supabase
-      .channel('public:users')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users' }, (payload) => {
+      .channel('public:users_data')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users_data' }, (payload) => {
         if (user && payload.new.id === user.id) {
           loadSession();
         }
@@ -106,7 +106,6 @@ const App: React.FC = () => {
   }
 
   const renderView = () => {
-    // Fix: Property 'is_banned' does not exist on type 'User'. Did you mean 'isBanned'?
     if (user.isBanned) return (
       <div className="min-h-[60vh] flex items-center justify-center p-10">
         <div className="glass-card p-16 rounded-[3.5rem] border-2 border-red-500/30 text-center space-y-6">
@@ -126,7 +125,6 @@ const App: React.FC = () => {
       case AppView.PROFILE: return <Profile user={user} onUpdateUser={updateUser} />;
       case AppView.GIFTCODE: return <Giftcode user={user} onUpdateUser={updateUser} />;
       case AppView.REFERRAL: return <Referral user={user} />;
-      // Fix: Property 'is_admin' does not exist on type 'User'. Did you mean 'isAdmin'?
       case AppView.ADMIN: return user.isAdmin ? <Admin user={user} onUpdateUser={updateUser} /> : <Dashboard user={user} setView={setCurrentView} />;
       case AppView.GUIDE: return <Guide />;
       case AppView.NOTIFICATIONS: return <UserNotifications user={user} />;
@@ -150,7 +148,6 @@ const App: React.FC = () => {
           
           <nav className="flex-1 space-y-2 overflow-y-auto no-scrollbar">
             {NAV_ITEMS.map(item => {
-              // Fix: Property 'is_admin' does not exist on type 'User'. Did you mean 'isAdmin'?
               if (item.adminOnly && !user?.isAdmin) return null;
               const active = currentView === item.id;
               return (

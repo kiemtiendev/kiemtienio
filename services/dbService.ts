@@ -30,41 +30,35 @@ const mapUser = (u: any): User => {
 export const dbService = {
   signup: async (email: string, pass: string, fullname: string, refId?: string) => {
     try {
-      // 1. Kiểm tra kết nối và bảng users
       const { data: existing, error: checkError } = await supabase
-        .from('users')
-        .select('id')
+        .from('users_data')
+        .select('id, email')
         .eq('email', email)
         .maybeSingle();
 
       if (checkError) {
-        // Xử lý lỗi cache schema một cách chuyên nghiệp
-        if (checkError.message.includes('cache') || checkError.message.includes('not found')) {
+        console.error("Supabase Error Details:", JSON.stringify(checkError));
+        const code = checkError.code || 'UNKNOWN';
+        
+        if (code === '42703') {
           return { 
             success: false, 
-            message: 'Đang khởi tạo Database... Vui lòng thử lại sau 30 giây (Schema Syncing).' 
+            message: `LỖI DB (42703): Bảng users_data của bạn đang bị thiếu cột quan trọng (id hoặc email). Hãy vào Admin -> Cài đặt DB để copy mã SQL tạo lại bảng!` 
           };
         }
-        return { success: false, message: 'Lỗi kết nối: ' + checkError.message };
+        return { success: false, message: `Lỗi Database: ${checkError.message}` };
       }
       
       if (existing) return { success: false, message: 'Email này đã được sử dụng!' };
 
-      // 2. Tạo ID người dùng mới (9 ký tự in hoa)
       const userId = Math.random().toString(36).substr(2, 9).toUpperCase();
-      
-      // 3. Kiểm tra số lượng user hiện tại để xác định Admin đầu tiên
-      const { count } = await supabase
-        .from('users')
-        .select('id', { count: 'exact', head: true });
-      
+      const { count } = await supabase.from('users_data').select('id', { count: 'exact', head: true });
       const isFirst = (count || 0) === 0;
 
-      // 4. Chuẩn bị dữ liệu hội viên (snake_case cho DB)
       const newUser = {
         id: userId,
         email,
-        password_hash: btoa(pass), // Simple encoding for demo, production should use argon2/bcrypt
+        password_hash: btoa(pass),
         fullname: fullname.toUpperCase(),
         balance: 0,
         total_earned: 0,
@@ -77,14 +71,13 @@ export const dbService = {
         task_counts: {}
       };
 
-      const { error: insertError } = await supabase.from('users').insert([newUser]);
+      const { error: insertError } = await supabase.from('users_data').insert([newUser]);
       if (insertError) return { success: false, message: 'Lỗi đăng ký: ' + insertError.message };
 
-      // 5. Thưởng người giới thiệu (nếu có)
       if (refId) {
-        const { data: refUser } = await supabase.from('users').select('balance,total_earned,referral_count,referral_bonus').eq('id', refId).maybeSingle();
+        const { data: refUser } = await supabase.from('users_data').select('*').eq('id', refId).maybeSingle();
         if (refUser) {
-          await supabase.from('users').update({
+          await supabase.from('users_data').update({
             balance: Number(refUser.balance || 0) + REFERRAL_REWARD,
             total_earned: Number(refUser.total_earned || 0) + REFERRAL_REWARD,
             referral_count: Number(refUser.referral_count || 0) + 1,
@@ -93,7 +86,6 @@ export const dbService = {
         }
       }
 
-      // 6. Thông báo cho Admin
       await dbService.addNotification({
         type: 'auth',
         title: 'HỘI VIÊN MỚI',
@@ -104,20 +96,22 @@ export const dbService = {
 
       return { success: true, message: 'Đăng ký thành công!' };
     } catch (err: any) {
-      return { success: false, message: 'Lỗi hệ thống: ' + err.message };
+      return { success: false, message: 'Lỗi hệ thống: ' + (err.message || String(err)) };
     }
   },
 
   login: async (email: string, pass: string) => {
     try {
       const { data: user, error } = await supabase
-        .from('users')
+        .from('users_data')
         .select('*')
         .eq('email', email)
         .eq('password_hash', btoa(pass))
         .maybeSingle();
 
-      if (error || !user) return null;
+      if (error) return null;
+      if (!user) return null;
+      
       localStorage.setItem('nova_session_id', user.id);
       return mapUser(user);
     } catch {
@@ -129,7 +123,7 @@ export const dbService = {
     const id = localStorage.getItem('nova_session_id');
     if (!id) return null;
     try {
-      const { data: user, error } = await supabase.from('users').select('*').eq('id', id).maybeSingle();
+      const { data: user, error } = await supabase.from('users_data').select('*').eq('id', id).maybeSingle();
       if (error || !user) return null;
       return mapUser(user);
     } catch {
@@ -143,7 +137,7 @@ export const dbService = {
 
   getTotalUserCount: async () => {
     try {
-      const { count } = await supabase.from('users').select('id', { count: 'exact', head: true });
+      const { count } = await supabase.from('users_data').select('id', { count: 'exact', head: true });
       return count || 0;
     } catch {
       return 0;
@@ -153,7 +147,6 @@ export const dbService = {
   updateUser: async (id: string, updates: Partial<User>) => {
     const dbUpdates: any = { ...updates };
     
-    // Convert camelCase to snake_case for DB
     if (updates.totalEarned !== undefined) dbUpdates.total_earned = updates.totalEarned;
     if (updates.isBanned !== undefined) dbUpdates.is_banned = updates.isBanned;
     if (updates.isAdmin !== undefined) dbUpdates.is_admin = updates.isAdmin;
@@ -170,12 +163,12 @@ export const dbService = {
     delete dbUpdates.bankInfo;
     delete dbUpdates.idGame;
 
-    await supabase.from('users').update(dbUpdates).eq('id', id);
+    await supabase.from('users_data').update(dbUpdates).eq('id', id);
   },
 
   getAllUsers: async () => {
     try {
-      const { data, error } = await supabase.from('users').select('*').order('balance', { ascending: false });
+      const { data, error } = await supabase.from('users_data').select('*').order('balance', { ascending: false });
       if (error) return [];
       return (data || []).map(mapUser);
     } catch {
@@ -224,9 +217,9 @@ export const dbService = {
   updateWithdrawalStatus: async (id: string, status: string, userId?: string, amount?: number) => {
     await supabase.from('withdrawals').update({ status }).eq('id', id);
     if (status === 'rejected' && userId && amount) {
-      const { data: user } = await supabase.from('users').select('balance').eq('id', userId).maybeSingle();
+      const { data: user } = await supabase.from('users_data').select('balance').eq('id', userId).maybeSingle();
       if (user) {
-        await supabase.from('users').update({ balance: Number(user.balance || 0) + (amount * RATE_VND_TO_POINT) }).eq('id', userId);
+        await supabase.from('users_data').update({ balance: Number(user.balance || 0) + (amount * RATE_VND_TO_POINT) }).eq('id', userId);
       }
     }
   },
@@ -298,7 +291,7 @@ export const dbService = {
       return (data || []).map(ad => ({
         ...ad,
         imageUrl: ad.image_url,
-        targetUrl: ad.target_url,
+        target_url: ad.target_url,
         isActive: ad.is_active,
         isHidden: ad.is_hidden
       }));
