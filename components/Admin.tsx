@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { User, WithdrawalRequest, Giftcode, Announcement, AdBanner, ActivityLog } from '../types.ts';
 import { dbService } from '../services/dbService.ts';
@@ -5,7 +6,8 @@ import { formatK } from '../constants.tsx';
 import { 
   Users, CreditCard, Search, Ban, Unlock, Plus, Trash2, Megaphone, ShieldCheck, 
   ShoppingBag, Ticket, History, Activity, Database, Copy, CheckCircle2, X, 
-  PlusCircle, Gamepad2, Building2, AlertTriangle, Loader2, Eye, EyeOff
+  PlusCircle, Gamepad2, Building2, AlertTriangle, Loader2, Eye, EyeOff,
+  LayoutTemplate, Image as ImageIcon, MessageSquarePlus, Tag
 } from 'lucide-react';
 
 interface Props {
@@ -47,6 +49,8 @@ const Admin: React.FC<Props> = ({ user }) => {
       setAnnouncements(a);
       setAds(adsData);
       setLogs(l);
+    } catch (err) {
+      console.error("Sync error:", err);
     } finally {
       setIsSyncing(false);
     }
@@ -67,7 +71,7 @@ const Admin: React.FC<Props> = ({ user }) => {
   };
 
   const handleAddAd = async () => {
-    if (!newAd.title || !newAd.imageUrl) return;
+    if (!newAd.title || !newAd.imageUrl) return alert("Vui lòng nhập đủ thông tin!");
     await dbService.saveAd(newAd);
     setNewAd({ title: '', imageUrl: '', targetUrl: '' });
     setShowModal(null);
@@ -80,14 +84,14 @@ const Admin: React.FC<Props> = ({ user }) => {
   };
 
   const handleDeleteAd = async (id: string) => {
-    if (window.confirm("Bạn có chắc chắn muốn xóa quảng cáo này?")) {
+    if (window.confirm("Xóa quảng cáo này?")) {
       await dbService.deleteAd(id);
       refreshData();
     }
   };
 
   const handleAddAnn = async () => {
-    if (!newAnn.title || !newAnn.content) return;
+    if (!newAnn.title || !newAnn.content) return alert("Vui lòng nhập đủ thông tin!");
     await dbService.saveAnnouncement(newAnn);
     setNewAnn({ title: '', content: '', priority: 'low' });
     setShowModal(null);
@@ -107,7 +111,7 @@ const Admin: React.FC<Props> = ({ user }) => {
   };
 
   const handleAddGc = async () => {
-    if (!newGc.code || !newGc.amount) return;
+    if (!newGc.code || !newGc.amount) return alert("Vui lòng nhập đủ thông tin!");
     await dbService.addGiftcode(newGc);
     setNewGc({ code: '', amount: 10000, maxUses: 100 });
     setShowModal(null);
@@ -259,7 +263,7 @@ ALTER TABLE public.activity_logs DISABLE ROW LEVEL SECURITY;`;
                     </tr>
                   </thead>
                   <tbody>
-                    {allUsers.filter(u => u.fullname.toLowerCase().includes(searchTerm.toLowerCase())).map(u => (
+                    {allUsers.filter(u => u.fullname.toLowerCase().includes(searchTerm.toLowerCase()) || u.email.toLowerCase().includes(searchTerm.toLowerCase())).map(u => (
                       <tr key={u.id} className="border-b border-white/5 hover:bg-white/[0.02]">
                         <td className="px-6 py-6">
                            <div className="font-black text-white italic text-base uppercase">{u.fullname}</div>
@@ -468,41 +472,79 @@ CREATE TABLE IF NOT EXISTS public.users_data (
         )}
       </div>
 
-      {/* MODALS */}
+      {/* MODALS CẢI TIẾN */}
       {showModal && (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6 animate-in fade-in duration-300">
            <div className="absolute inset-0 bg-black/90 backdrop-blur-xl" onClick={() => setShowModal(null)}></div>
-           <div className="glass-card w-full max-w-lg p-10 md:p-14 rounded-[4rem] border border-white/10 relative animate-in zoom-in-95 shadow-3xl">
-              <button onClick={() => setShowModal(null)} className="absolute top-8 right-8 text-slate-500 hover:text-white"><X /></button>
+           <div className="glass-card w-full max-w-lg p-8 md:p-12 rounded-[3.5rem] border border-white/10 relative animate-in zoom-in-95 shadow-3xl bg-slate-950/80">
+              <button onClick={() => setShowModal(null)} className="absolute top-6 right-6 text-slate-500 hover:text-white"><X /></button>
+              
               {showModal === 'ad' && (
-                <div className="space-y-8">
-                   <h3 className="text-3xl font-black text-white italic uppercase tracking-tighter text-center">THÊM BANNER</h3>
-                   <div className="space-y-5">
-                      <input type="text" placeholder="Tiêu đề Banner" value={newAd.title} onChange={e => setNewAd({...newAd, title: e.target.value})} className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-6 py-5 text-white font-bold outline-none" />
-                      <input type="text" placeholder="Link ảnh (URL)" value={newAd.imageUrl} onChange={e => setNewAd({...newAd, imageUrl: e.target.value})} className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-6 py-5 text-white font-bold outline-none" />
-                      <input type="text" placeholder="Link đích (URL)" value={newAd.targetUrl} onChange={e => setNewAd({...newAd, targetUrl: e.target.value})} className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-6 py-5 text-white font-bold outline-none" />
-                      <button onClick={handleAddAd} className="w-full bg-blue-600 py-6 rounded-2xl font-black text-white uppercase italic tracking-widest shadow-xl">LƯU QUẢNG CÁO</button>
+                <div className="space-y-6">
+                   <div className="flex flex-col items-center gap-3">
+                      <div className="p-4 bg-blue-600/20 rounded-2xl text-blue-500 border border-blue-500/20"><ImageIcon className="w-8 h-8" /></div>
+                      <h3 className="text-2xl font-black text-white italic uppercase tracking-tighter text-center">TẠO QUẢNG CÁO</h3>
+                   </div>
+                   <div className="space-y-4">
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 italic">Tiêu đề Banner</label>
+                        <input type="text" placeholder="Nhập tiêu đề..." value={newAd.title} onChange={e => setNewAd({...newAd, title: e.target.value})} className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-5 py-4 text-white font-bold outline-none focus:border-blue-500 transition-all" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 italic">URL Hình ảnh</label>
+                        <input type="text" placeholder="https://..." value={newAd.imageUrl} onChange={e => setNewAd({...newAd, imageUrl: e.target.value})} className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-5 py-4 text-white font-bold outline-none focus:border-blue-500 transition-all" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 italic">Link đích (Target)</label>
+                        <input type="text" placeholder="https://..." value={newAd.targetUrl} onChange={e => setNewAd({...newAd, targetUrl: e.target.value})} className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-5 py-4 text-white font-bold outline-none focus:border-blue-500 transition-all" />
+                      </div>
+                      <button onClick={handleAddAd} className="w-full bg-blue-600 py-5 rounded-2xl font-black text-white uppercase italic tracking-widest shadow-xl hover:brightness-110 active:scale-95 transition-all mt-4">KÍCH HOẠT QUẢNG CÁO</button>
                    </div>
                 </div>
               )}
+
               {showModal === 'ann' && (
-                <div className="space-y-8">
-                   <h3 className="text-3xl font-black text-white italic uppercase tracking-tighter text-center">TẠO THÔNG BÁO</h3>
-                   <div className="space-y-5">
-                      <input type="text" placeholder="Tiêu đề thông báo" value={newAnn.title} onChange={e => setNewAnn({...newAnn, title: e.target.value})} className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-6 py-5 text-white font-bold outline-none" />
-                      <textarea placeholder="Nội dung chi tiết..." value={newAnn.content} onChange={e => setNewAnn({...newAnn, content: e.target.value})} rows={5} className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-6 py-5 text-white font-bold outline-none resize-none" />
-                      <button onClick={handleAddAnn} className="w-full bg-amber-600 py-6 rounded-2xl font-black text-white uppercase italic tracking-widest shadow-xl">PHÁT HÀNH TIN</button>
+                <div className="space-y-6">
+                   <div className="flex flex-col items-center gap-3">
+                      <div className="p-4 bg-amber-600/20 rounded-2xl text-amber-500 border border-amber-500/20"><MessageSquarePlus className="w-8 h-8" /></div>
+                      <h3 className="text-2xl font-black text-white italic uppercase tracking-tighter text-center">THÔNG BÁO MỚI</h3>
+                   </div>
+                   <div className="space-y-4">
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 italic">Tiêu đề bản tin</label>
+                        <input type="text" placeholder="Nhập tiêu đề..." value={newAnn.title} onChange={e => setNewAnn({...newAnn, title: e.target.value})} className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-5 py-4 text-white font-bold outline-none focus:border-amber-500 transition-all" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 italic">Nội dung chi tiết</label>
+                        <textarea placeholder="Nội dung thông báo..." value={newAnn.content} onChange={e => setNewAnn({...newAnn, content: e.target.value})} rows={4} className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-5 py-4 text-white font-bold outline-none focus:border-amber-500 transition-all resize-none" />
+                      </div>
+                      <button onClick={handleAddAnn} className="w-full bg-amber-600 py-5 rounded-2xl font-black text-white uppercase italic tracking-widest shadow-xl hover:brightness-110 active:scale-95 transition-all mt-4">PHÁT HÀNH TIN</button>
                    </div>
                 </div>
               )}
+
               {showModal === 'gc' && (
-                <div className="space-y-8">
-                   <h3 className="text-3xl font-black text-white italic uppercase tracking-tighter text-center">TẠO GIFTCODE</h3>
-                   <div className="space-y-5">
-                      <input type="text" placeholder="Mã Code (VD: FREE100K)" value={newGc.code} onChange={e => setNewGc({...newGc, code: e.target.value.toUpperCase()})} className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-6 py-5 text-white font-black uppercase italic outline-none tracking-widest" />
-                      <input type="number" placeholder="Số điểm tặng" value={newGc.amount} onChange={e => setNewGc({...newGc, amount: parseInt(e.target.value)})} className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-6 py-5 text-white font-bold outline-none" />
-                      <input type="number" placeholder="Lượt nhập tối đa" value={newGc.maxUses} onChange={e => setNewGc({...newGc, maxUses: parseInt(e.target.value)})} className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-6 py-5 text-white font-bold outline-none" />
-                      <button onClick={handleAddGc} className="w-full bg-rose-600 py-6 rounded-2xl font-black text-white uppercase italic tracking-widest shadow-xl">TẠO MÃ QUÀ TẶNG</button>
+                <div className="space-y-6">
+                   <div className="flex flex-col items-center gap-3">
+                      <div className="p-4 bg-rose-600/20 rounded-2xl text-rose-500 border border-rose-500/20"><Tag className="w-8 h-8" /></div>
+                      <h3 className="text-2xl font-black text-white italic uppercase tracking-tighter text-center">TẠO GIFTCODE</h3>
+                   </div>
+                   <div className="space-y-4">
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 italic">Mã Code (In hoa)</label>
+                        <input type="text" placeholder="VD: NOVA100K" value={newGc.code} onChange={e => setNewGc({...newGc, code: e.target.value.toUpperCase()})} className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-5 py-4 text-white font-black italic tracking-widest outline-none focus:border-rose-500 transition-all" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 italic">Số điểm tặng</label>
+                          <input type="number" value={newGc.amount} onChange={e => setNewGc({...newGc, amount: parseInt(e.target.value)})} className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-5 py-4 text-white font-bold outline-none focus:border-rose-500 transition-all" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 italic">Lượt nhập</label>
+                          <input type="number" value={newGc.maxUses} onChange={e => setNewGc({...newGc, maxUses: parseInt(e.target.value)})} className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-5 py-4 text-white font-bold outline-none focus:border-rose-500 transition-all" />
+                        </div>
+                      </div>
+                      <button onClick={handleAddGc} className="w-full bg-rose-600 py-5 rounded-2xl font-black text-white uppercase italic tracking-widest shadow-xl hover:brightness-110 active:scale-95 transition-all mt-4">LƯU MÃ QUÀ TẶNG</button>
                    </div>
                 </div>
               )}

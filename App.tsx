@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { AppView, User } from './types.ts';
 import { dbService, supabase } from './services/dbService.ts';
-import { NAV_ITEMS } from './constants.tsx';
+import { NAV_ITEMS, formatK } from './constants.tsx';
 import { 
   Menu, 
   LogOut, 
@@ -12,7 +12,8 @@ import {
   WifiOff,
   Bell,
   Activity,
-  X
+  X,
+  Star
 } from 'lucide-react';
 
 // Components
@@ -28,6 +29,7 @@ import Admin from './components/Admin.tsx';
 import Guide from './components/Guide.tsx';
 import UserNotifications from './components/UserNotifications.tsx';
 import Support from './components/Support.tsx';
+import GlobalSearch from './components/GlobalSearch.tsx';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -144,14 +146,17 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen flex bg-[#06080c] text-slate-200">
       {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 z-50 w-72 glass-card border-r border-white/5 transform transition-transform md:relative md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <aside className={`fixed inset-y-0 left-0 z-[100] w-72 glass-card border-r border-white/5 transform transition-transform md:relative md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="h-full flex flex-col p-8">
-          <div className="flex items-center gap-4 mb-12 px-2">
-             <Sparkles className="w-10 h-10 text-blue-500" />
-             <div>
-               <h2 className="font-black text-xl text-white italic">NOVA</h2>
-               <span className="text-[9px] font-black text-blue-500 tracking-widest uppercase">CLOUD SYNC v1</span>
+          <div className="flex items-center justify-between mb-12 px-2">
+             <div className="flex items-center gap-4">
+                <Sparkles className="w-10 h-10 text-blue-500" />
+                <div>
+                  <h2 className="font-black text-xl text-white italic">NOVA</h2>
+                  <span className="text-[9px] font-black text-blue-500 tracking-widest uppercase">CLOUD SYNC v1</span>
+                </div>
              </div>
+             <button onClick={() => setIsSidebarOpen(false)} className="md:hidden p-2 text-slate-500"><X size={20} /></button>
           </div>
           
           <nav className="flex-1 space-y-2 overflow-y-auto no-scrollbar">
@@ -186,11 +191,37 @@ const App: React.FC = () => {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto p-4 md:p-10 relative">
-        <div className="md:hidden flex items-center justify-between mb-8 glass-card p-4 rounded-2xl">
-           <Sparkles className="w-7 h-7 text-blue-500" />
-           <button onClick={() => setIsSidebarOpen(true)} className="p-2 bg-slate-900 rounded-xl text-white"><Menu className="w-6 h-6" /></button>
-        </div>
+      <main className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-10 relative">
+        {/* Universal Header with GlobalSearch */}
+        <header className="flex items-center justify-between gap-6 mb-10 glass-card p-4 rounded-3xl border border-white/5">
+           <div className="flex items-center gap-4 md:hidden">
+              <button onClick={() => setIsSidebarOpen(true)} className="p-3 bg-slate-900 rounded-xl text-white">
+                <Menu className="w-6 h-6" />
+              </button>
+              <Sparkles className="w-7 h-7 text-blue-500" />
+           </div>
+
+           <div className="flex-1 max-w-xl mx-auto md:mx-0">
+              <GlobalSearch onNavigate={setCurrentView} isAdmin={user?.isAdmin || false} />
+           </div>
+
+           <div className="hidden lg:flex items-center gap-6 px-4">
+              <div className="flex flex-col items-end">
+                 <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest italic">Số dư hiện tại</span>
+                 <div className="flex items-center gap-2">
+                    <Star className="w-3 h-3 text-emerald-500 animate-pulse" />
+                    <span className="text-lg font-black text-emerald-500 italic tracking-tighter">{formatK(user.balance)} P</span>
+                 </div>
+              </div>
+              <button 
+                onClick={() => setCurrentView(AppView.NOTIFICATIONS)}
+                className="relative p-3 bg-white/5 border border-white/5 rounded-2xl hover:bg-white/10 transition-all"
+              >
+                 <Bell size={20} className="text-slate-400" />
+                 {hasNewNotif && <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-ping"></span>}
+              </button>
+           </div>
+        </header>
         
         <div className="max-w-6xl mx-auto">
           {renderView()}
@@ -212,7 +243,7 @@ const App: React.FC = () => {
 
         {/* Global Alert for New Notifs */}
         {hasNewNotif && (
-          <div className="fixed top-10 left-1/2 -translate-x-1/2 z-[100] bg-blue-600 text-white px-8 py-4 rounded-full font-black text-xs uppercase tracking-widest italic shadow-2xl flex items-center gap-4 animate-bounce">
+          <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] bg-blue-600 text-white px-8 py-4 rounded-full font-black text-xs uppercase tracking-widest italic shadow-2xl flex items-center gap-4 animate-bounce border border-white/20">
             <Bell className="w-5 h-5" /> CÓ THÔNG BÁO MỚI TỪ HỆ THỐNG!
           </div>
         )}

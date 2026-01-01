@@ -23,7 +23,6 @@ const Withdraw: React.FC<Props> = ({ user, onUpdateUser, initialHistory = false 
     setShowHistory(initialHistory);
   }, [initialHistory]);
 
-  // Fix: dbService.getWithdrawals returns a Promise.
   useEffect(() => {
     const fetchHistory = async () => {
       const data = await dbService.getWithdrawals(user.id);
@@ -35,7 +34,6 @@ const Withdraw: React.FC<Props> = ({ user, onUpdateUser, initialHistory = false 
   const pointsNeeded = selectedMilestone ? selectedMilestone * RATE_VND_TO_POINT : 0;
   const canAfford = user.balance >= pointsNeeded;
 
-  // Quy đổi: 50.000 P (5k VND) = 25 KC -> 1 KC = 2000 P
   const getGameDiamondValue = (vnd: number) => {
     return Math.floor((vnd * RATE_VND_TO_POINT) / POINT_PER_DIAMOND);
   };
@@ -49,7 +47,8 @@ const Withdraw: React.FC<Props> = ({ user, onUpdateUser, initialHistory = false 
     setTimeout(async () => {
       const request: Partial<WithdrawalRequest> = {
         userId: user.id,
-        userName: user.fullname,
+        // Gắn thêm Email vào userName để Admin dễ tìm
+        userName: `${user.fullname} (${user.email})`,
         amount: selectedMilestone,
         type: method,
         status: 'pending',
@@ -64,7 +63,7 @@ const Withdraw: React.FC<Props> = ({ user, onUpdateUser, initialHistory = false 
       setIsSuccess(true);
       setMethod(null);
       setSelectedMilestone(null);
-      // Refresh history after adding a new one
+      
       const data = await dbService.getWithdrawals(user.id);
       setHistory(data);
     }, 1500);
@@ -193,9 +192,6 @@ const Withdraw: React.FC<Props> = ({ user, onUpdateUser, initialHistory = false 
                 )}
               </button>
             </div>
-            {!canAfford && selectedMilestone && (
-              <p className="text-center text-[10px] text-red-500 font-black uppercase italic tracking-widest animate-pulse">Bạn không đủ điểm để thực hiện lệnh rút này.</p>
-            )}
           </div>
         </div>
       )}

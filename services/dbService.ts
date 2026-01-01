@@ -29,9 +29,10 @@ const mapUser = (u: any): User => {
 
 const handleDbError = (err: any, fallback: any = []) => {
   if (err?.status === 404 || err?.code === 'PGRST116') {
-    console.warn("Database table missing. Run SQL in Admin Setup.");
+    console.warn("Database table missing or record not found.");
     return fallback;
   }
+  console.error("Database Error:", err);
   return fallback;
 };
 
@@ -135,7 +136,6 @@ export const dbService = {
 
   getAnnouncements: async (all = false) => {
     let q = supabase.from('announcements').select('*').order('created_at', { ascending: false });
-    // Nếu không phải admin lấy hết, thì chỉ lấy is_active = true
     if (!all) {
       q = q.eq('is_active', true);
     }
@@ -144,7 +144,14 @@ export const dbService = {
   },
 
   saveAnnouncement: async (ann: any) => {
-    await supabase.from('announcements').insert([{ title: ann.title, content: ann.content, priority: ann.priority, is_active: true, created_at: new Date().toISOString() }]);
+    // Sử dụng insert thay vì upsert để đảm bảo tạo bản ghi mới có UUID tự động
+    await supabase.from('announcements').insert([{ 
+      title: ann.title, 
+      content: ann.content, 
+      priority: ann.priority || 'low', 
+      is_active: true, 
+      created_at: new Date().toISOString() 
+    }]);
   },
 
   updateAnnouncementStatus: async (id: string, isActive: boolean) => {
@@ -163,7 +170,13 @@ export const dbService = {
   },
 
   saveAd: async (ad: any) => {
-    await supabase.from('ads').upsert([{ title: ad.title, image_url: ad.imageUrl, target_url: ad.targetUrl, is_active: true }]);
+    // Sử dụng insert thay vì upsert
+    await supabase.from('ads').insert([{ 
+      title: ad.title, 
+      image_url: ad.imageUrl, 
+      target_url: ad.targetUrl, 
+      is_active: true 
+    }]);
   },
 
   updateAdStatus: async (id: string, isActive: boolean) => {
@@ -182,7 +195,14 @@ export const dbService = {
   },
 
   addGiftcode: async (gc: any) => {
-    await supabase.from('giftcodes').insert([{ code: gc.code, amount: gc.amount, max_uses: gc.maxUses, used_by: [], is_active: true, created_at: new Date().toISOString() }]);
+    await supabase.from('giftcodes').insert([{ 
+      code: gc.code.toUpperCase(), 
+      amount: gc.amount, 
+      max_uses: gc.maxUses, 
+      used_by: [], 
+      is_active: true, 
+      created_at: new Date().toISOString() 
+    }]);
   },
 
   updateGiftcodeStatus: async (code: string, isActive: boolean) => {
