@@ -76,7 +76,8 @@ const Tasks: React.FC<Props> = ({ user, onUpdateUser }) => {
     localStorage.setItem('nova_pending_task', JSON.stringify(taskData));
     setActiveTask(taskData);
     
-    dbService.logActivity(user.id, user.fullname, 'Mining Startup', `Task: ${gate.name}`);
+    // Fix: dbService.logActivity expects 4 arguments based on updated definition.
+    await dbService.logActivity(user.id, user.fullname, 'Nhiệm vụ mới', `Cổng: ${gate.name}`);
     await openTaskLink(id, user.id, token);
     setGeneratingGate(null);
   };
@@ -85,7 +86,7 @@ const Tasks: React.FC<Props> = ({ user, onUpdateUser }) => {
     if (!activeTask || !inputToken.trim()) return;
     setStatus('loading');
 
-    setTimeout(() => {
+    setTimeout(async () => {
       const input = inputToken.trim().toUpperCase();
       if (input === activeTask.token || input === activeTask.token.replace('NOVA-', '')) {
         const newTaskCounts = { ...user.taskCounts };
@@ -101,7 +102,8 @@ const Tasks: React.FC<Props> = ({ user, onUpdateUser }) => {
         };
 
         onUpdateUser(updatedUser);
-        dbService.logActivity(user.id, user.fullname, 'Mining Authorized', `Earned +${activeTask.points} P from ${activeTask.gateName}`);
+        // Fix: dbService.logActivity expects 4 arguments.
+        await dbService.logActivity(user.id, user.fullname, 'Hoàn thành nhiệm vụ', `Nhận +${activeTask.points} P từ ${activeTask.gateName}`);
         
         setStatus('success');
         localStorage.removeItem('nova_pending_task');
@@ -119,7 +121,6 @@ const Tasks: React.FC<Props> = ({ user, onUpdateUser }) => {
 
   return (
     <div className="space-y-12 animate-in fade-in duration-1000 pb-24 px-2">
-      
       {/* 1. AUTHENTICATION TERMINAL */}
       <div className="relative pt-8 max-w-4xl mx-auto">
         <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#02040a] px-10 z-10 border-x-2 border-cyan-500/50 py-1">
@@ -127,10 +128,7 @@ const Tasks: React.FC<Props> = ({ user, onUpdateUser }) => {
              <Terminal className="w-4 h-4" /> VERIFICATION CORE
           </span>
         </div>
-        
         <div className="glass-card p-10 md:p-16 rounded-[4rem] border-2 border-cyan-500/20 bg-gradient-to-b from-blue-900/30 to-black/95 backdrop-blur-3xl shadow-[0_0_100px_rgba(6,182,212,0.15)] relative overflow-hidden">
-          <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]"></div>
-          
           <div className="flex flex-col items-center text-center gap-8 relative z-10">
              <div className="w-24 h-24 bg-cyan-500/10 rounded-[2.5rem] flex items-center justify-center border-2 border-cyan-500/30 security-pulse">
                 {status === 'loading' ? (
@@ -139,48 +137,28 @@ const Tasks: React.FC<Props> = ({ user, onUpdateUser }) => {
                   <LockKeyhole className="w-12 h-12 text-cyan-400" />
                 )}
              </div>
-             
              <div className="space-y-2">
                 <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter drop-shadow-lg">XÁC THỰC SECURITY KEY</h2>
                 <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.4em] italic leading-relaxed max-w-md mx-auto">NHẬP MÃ THU THẬP ĐƯỢC TỪ BLOG ĐỂ GIẢI PHÓNG ĐIỂM THƯỞNG</p>
              </div>
-
              <div className="w-full space-y-6">
                 <div className="relative group">
-                  <input 
-                    type="text" 
-                    value={inputToken}
-                    onChange={(e) => setInputToken(e.target.value)}
-                    placeholder="NOVA-XXXX-XXXX" 
-                    className="w-full bg-black/80 border-2 border-slate-900 rounded-3xl px-10 py-7 text-cyan-400 text-center font-black tracking-[0.4em] outline-none transition-all text-2xl uppercase focus:border-cyan-500 shadow-inner"
-                  />
+                  <input type="text" value={inputToken} onChange={(e) => setInputToken(e.target.value)} placeholder="NOVA-XXXX-XXXX" className="w-full bg-black/80 border-2 border-slate-900 rounded-3xl px-10 py-7 text-cyan-400 text-center font-black tracking-[0.4em] outline-none transition-all text-2xl uppercase focus:border-cyan-500 shadow-inner" />
                   <div className="absolute right-6 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-cyan-500 animate-ping"></div>
                 </div>
-
-                <button 
-                  onClick={verifyTask}
-                  disabled={status === 'loading' || !inputToken.trim() || !activeTask}
-                  className={`w-full py-8 rounded-3xl font-black text-[12px] tracking-[0.4em] transition-all flex items-center justify-center gap-4 italic shadow-2xl ${
-                    status === 'loading' || !activeTask
-                    ? 'bg-slate-900 text-slate-700 cursor-not-allowed border border-white/5' 
-                    : 'bg-gradient-to-r from-cyan-600 via-blue-700 to-indigo-800 text-white hover:brightness-125 hover:shadow-cyan-500/40 active:scale-95'
-                  }`}
-                >
+                <button onClick={verifyTask} disabled={status === 'loading' || !inputToken.trim() || !activeTask} className={`w-full py-8 rounded-3xl font-black text-[12px] tracking-[0.4em] transition-all flex items-center justify-center gap-4 italic shadow-2xl ${status === 'loading' || !activeTask ? 'bg-slate-900 text-slate-700 cursor-not-allowed border border-white/5' : 'bg-gradient-to-r from-cyan-600 via-blue-700 to-indigo-800 text-white hover:brightness-125 hover:shadow-cyan-500/40 active:scale-95'}`}>
                   {status === 'loading' ? 'XÁC MINH DỮ LIỆU...' : 'KÍCH HOẠT QUY TRÌNH TRÍCH XUẤT'}
                 </button>
-
                 {status === 'success' && (
                   <div className="bg-emerald-500/10 border-2 border-emerald-500/20 p-5 rounded-3xl flex items-center justify-center gap-4 text-emerald-400 font-black uppercase italic text-xs tracking-[0.2em] animate-bounce shadow-[0_0_20px_rgba(16,185,129,0.2)]">
                     <CheckCircle2 className="w-6 h-6" /> 💎 THÀNH CÔNG! ĐÃ CỘNG {activeTask?.points} P
                   </div>
                 )}
-                
                 {status === 'error' && (
                   <div className="bg-red-500/10 border-2 border-red-500/20 p-5 rounded-3xl flex items-center justify-center gap-4 text-red-400 font-black uppercase italic text-xs tracking-[0.2em]">
                     <ShieldAlert className="w-6 h-6" /> MÃ KEY KHÔNG CHÍNH XÁC! KIỂM TRA LẠI.
                   </div>
                 )}
-
                 {!activeTask && status !== 'success' && (
                    <div className="flex items-center justify-center gap-3 text-slate-600 text-[10px] font-black uppercase tracking-[0.2em] italic bg-black/40 py-4 rounded-2xl border border-white/5">
                       <MousePointer2 className="w-4 h-4" /> VUI LÒNG BẮT ĐẦU 1 NHIỆM VỤ PHÍA DƯỚI
@@ -191,25 +169,23 @@ const Tasks: React.FC<Props> = ({ user, onUpdateUser }) => {
         </div>
       </div>
 
-      {/* 2. MINING NODES */}
+      {/* 2. BẢNG NHIỆM VỤ */}
       <div className="space-y-10 pt-10">
         <div className="flex items-center gap-6 justify-center md:justify-start">
-           <div className="p-5 bg-cyan-500/10 rounded-[1.5rem] border-2 border-cyan-500/20 shadow-glow-blue">
+           <div className="p-5 bg-cyan-500/10 rounded-[1.5rem] border-2 border-cyan-500/20">
               <LayoutGrid className="w-8 h-8 text-cyan-400" />
            </div>
            <div>
-              <h3 className="text-4xl font-black text-white italic uppercase tracking-tighter">CÁC NHIỆM VỤ KHAI THÁC</h3>
-              <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.4em] italic">CHỌN CỔNG TRUY CẬP ĐỂ BẮT ĐẦU KIẾM ĐIỂM</p>
+              <h3 className="text-4xl font-black text-white italic uppercase tracking-tighter">BẢNG NHIỆM VỤ</h3>
+              <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.4em] italic">CHỌN CỔNG TRUY CẬP ĐỂ BẮT ĐẦU NHẬN THƯỞNG</p>
            </div>
         </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
           {Object.entries(TASK_RATES).map(([idStr, gate]) => {
             const id = parseInt(idStr);
             const currentCount = user.taskCounts[gate.name] || 0;
             const isFull = currentCount >= gate.limit;
             const isGenerating = generatingGate === id;
-
             return (
               <div key={id} className={`group relative glass-card p-12 rounded-[3.5rem] border-2 transition-all duration-500 overflow-hidden flex flex-col justify-between shadow-2xl ${isFull ? 'border-red-500/10 grayscale opacity-40' : 'hover:border-cyan-400/50 border-white/5 bg-[#0a0f1e]/90'}`}>
                 <div className="relative z-10">
@@ -222,7 +198,6 @@ const Tasks: React.FC<Props> = ({ user, onUpdateUser }) => {
                       {isFull ? <Lock className="w-7 h-7" /> : <Zap className="w-7 h-7 animate-pulse" />}
                     </div>
                   </div>
-
                   <div className="space-y-6 mb-12">
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-black text-slate-600 uppercase italic tracking-widest">THƯỞNG</span>
@@ -234,12 +209,7 @@ const Tasks: React.FC<Props> = ({ user, onUpdateUser }) => {
                     </div>
                   </div>
                 </div>
-
-                <button 
-                  onClick={() => startTask(id)} 
-                  disabled={isFull || isGenerating}
-                  className={`w-full h-18 rounded-3xl font-black uppercase italic text-[11px] tracking-[0.3em] transition-all flex items-center justify-center gap-4 relative overflow-hidden group/btn ${isFull ? 'bg-slate-900 text-slate-700' : 'bg-white text-black hover:bg-cyan-500 hover:text-white shadow-xl hover:shadow-cyan-500/30'}`}
-                >
+                <button onClick={() => startTask(id)} disabled={isFull || isGenerating} className={`w-full h-18 rounded-3xl font-black uppercase italic text-[11px] tracking-[0.3em] transition-all flex items-center justify-center gap-4 relative overflow-hidden group/btn ${isFull ? 'bg-slate-900 text-slate-700' : 'bg-white text-black hover:bg-cyan-500 hover:text-white shadow-xl hover:shadow-cyan-500/30'}`}>
                   {isGenerating ? <Loader2 className="w-6 h-6 animate-spin" /> : isFull ? 'NHIỆM VỤ ĐÃ HẾT' : (
                     <>
                       <span>BẮT ĐẦU NHIỆM VỤ</span>
@@ -253,10 +223,7 @@ const Tasks: React.FC<Props> = ({ user, onUpdateUser }) => {
           })}
         </div>
       </div>
-
-      <style>{`
-        .shadow-glow-blue { box-shadow: 0 0 20px rgba(6, 182, 212, 0.3); }
-      `}</style>
+      <style>{`.shadow-glow-blue { box-shadow: 0 0 20px rgba(6, 182, 212, 0.3); }`}</style>
     </div>
   );
 };

@@ -1,6 +1,6 @@
 
 import React, { useMemo, useEffect, useState, useRef } from 'react';
-import { User, AppView } from '../types.ts';
+import { User, AppView, Announcement, AdBanner, AdminNotification } from '../types.ts';
 import { dbService } from '../services/dbService.ts';
 import { formatK, DAILY_TASK_LIMIT } from '../constants.tsx';
 import { 
@@ -90,14 +90,25 @@ const StatCard: React.FC<{
 };
 
 const Dashboard: React.FC<Props> = ({ user, setView }) => {
-  const announcements = useMemo(() => dbService.getAnnouncements(), []);
-  const ads = useMemo(() => dbService.getAds(false).filter(a => a.isActive), []);
-  const latestAnnouncement = announcements[0];
-  
-  const personalNotifications = useMemo(() => {
-    return dbService.getNotifications().filter(n => n.userId === user.id).slice(0, 5);
+  // Fix: dbService.getAnnouncements and getAds return Promises. Using state to manage async data.
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [ads, setAds] = useState<AdBanner[]>([]);
+  const [personalNotifications, setPersonalNotifications] = useState<AdminNotification[]>([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const anns = await dbService.getAnnouncements();
+      setAnnouncements(anns);
+      const allAds = await dbService.getAds(false);
+      setAds(allAds.filter(a => a.isActive));
+      const notifs = await dbService.getNotifications(user.id);
+      setPersonalNotifications(notifs.slice(0, 5));
+    };
+    fetchData();
   }, [user.id]);
 
+  const latestAnnouncement = announcements[0];
+  
   return (
     <div className="space-y-6 md:space-y-10 animate-in fade-in duration-700">
       <div className="w-full bg-gradient-to-r from-blue-600/30 via-indigo-600/20 to-blue-600/30 border border-blue-500/40 rounded-[2.5rem] overflow-hidden py-5 px-10 flex items-center gap-6 group shadow-2xl backdrop-blur-3xl">
@@ -221,7 +232,7 @@ const Dashboard: React.FC<Props> = ({ user, setView }) => {
                 <p className="text-slate-600 font-black uppercase italic tracking-widest text-xs">Chưa có thông báo hoạt động nào mới.</p>
              </div>
            ) : (
-             personalNotifications.map((n, i) => (
+             personalNotifications.map((n) => (
                <div key={n.id} className="flex items-center justify-between p-6 rounded-3xl bg-white/[0.03] border border-white/5 hover:bg-white/5 transition-all group">
                   <div className="flex items-center gap-5">
                      <div className={`p-3 rounded-xl ${n.type === 'referral' ? 'bg-purple-600/20 text-purple-400' : 'bg-blue-600/20 text-blue-400'}`}>

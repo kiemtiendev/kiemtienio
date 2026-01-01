@@ -1,17 +1,19 @@
 
 import React, { useState, useEffect } from 'react';
 import { AppView, User } from './types.ts';
-import { dbService } from './services/dbService.ts';
+import { dbService, supabase } from './services/dbService.ts';
 import { NAV_ITEMS } from './constants.tsx';
 import { 
   Menu, 
   LogOut, 
   Sparkles,
   Bot,
-  MessageSquareText
+  Wifi,
+  WifiOff,
+  Bell
 } from 'lucide-react';
 
-// Components - Tất cả import từ thư mục gốc/components
+// Components
 import Login from './components/Login.tsx';
 import Dashboard from './components/Dashboard.tsx';
 import Tasks from './components/Tasks.tsx';
@@ -30,14 +32,47 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>(AppView.DASHBOARD);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isOnline, setIsOnline] = useState(true);
+  const [hasNewNotif, setHasNewNotif] = useState(false);
+
+  const loadSession = async () => {
+    const sessionUser = await dbService.getCurrentUser();
+    setUser(sessionUser);
+    setIsLoading(false);
+  };
 
   useEffect(() => {
-    const sessionUser = dbService.getCurrentUser();
-    if (sessionUser) {
-      setUser(sessionUser);
-    }
-    setIsLoading(false);
-  }, []);
+    loadSession();
+
+    // REAL-TIME: Lắng nghe thay đổi Database từ Supabase
+    const userSubscription = supabase
+      .channel('public:users')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users' }, (payload) => {
+        if (user && payload.new.id === user.id) {
+          loadSession();
+        }
+      })
+      .subscribe();
+
+    const notifSubscription = supabase
+      .channel('public:notifications')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, (payload) => {
+        if (user && (payload.new.user_id === user.id || payload.new.user_id === 'all')) {
+          setHasNewNotif(true);
+          // Auto clear after 5s
+          setTimeout(() => setHasNewNotif(false), 5000);
+        }
+      })
+      .subscribe();
+
+    const onlineInterval = setInterval(() => setIsOnline(navigator.onLine), 5000);
+
+    return () => {
+      supabase.removeChannel(userSubscription);
+      supabase.removeChannel(notifSubscription);
+      clearInterval(onlineInterval);
+    };
+  }, [user?.id]);
 
   const handleLoginSuccess = (u: User) => {
     setUser(u);
@@ -50,9 +85,9 @@ const App: React.FC = () => {
     setCurrentView(AppView.DASHBOARD);
   };
 
-  const updateUser = (updated: User) => { 
+  const updateUser = async (updated: User) => { 
     setUser(updated); 
-    dbService.updateCurrentUser(updated); 
+    await dbService.updateUser(updated.id, updated); 
   };
 
   if (isLoading) {
@@ -60,19 +95,28 @@ const App: React.FC = () => {
       <div className="min-h-screen bg-[#06080c] flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <Sparkles className="w-12 h-12 text-blue-500 animate-pulse" />
-          <span className="text-slate-500 font-black uppercase tracking-widest text-[10px]">Đang khởi tạo Nova Core...</span>
+          <span className="text-slate-500 font-black uppercase tracking-widest text-[10px]">Đang kết nối hệ thống Nova Cloud...</span>
         </div>
       </div>
     );
   }
 
-  // Luồng ưu tiên: Render Login nếu chưa có session
   if (!user) {
     return <Login onLoginSuccess={handleLoginSuccess} />;
   }
 
   const renderView = () => {
-    if (user.isBanned) return <div className="p-20 text-center text-red-500 font-black uppercase tracking-[0.2em] glass-card rounded-3xl m-6">Tài khoản đã bị đình chỉ.</div>;
+    // Fix: Property 'is_banned' does not exist on type 'User'. Did you mean 'isBanned'?
+    if (user.isBanned) return (
+      <div className="min-h-[60vh] flex items-center justify-center p-10">
+        <div className="glass-card p-16 rounded-[3.5rem] border-2 border-red-500/30 text-center space-y-6">
+          <WifiOff className="w-20 h-20 text-red-500 mx-auto" />
+          <h2 className="text-3xl font-black text-white uppercase italic">TRUY CẬP BỊ TỪ CHỐI</h2>
+          <p className="text-slate-500 italic text-sm">Tài khoản này đã bị đình chỉ do vi phạm.</p>
+        </div>
+      </div>
+    );
+
     switch (currentView) {
       case AppView.DASHBOARD: return <Dashboard user={user} setView={setCurrentView} />;
       case AppView.TASKS: return <Tasks user={user} onUpdateUser={updateUser} />;
@@ -82,6 +126,7 @@ const App: React.FC = () => {
       case AppView.PROFILE: return <Profile user={user} onUpdateUser={updateUser} />;
       case AppView.GIFTCODE: return <Giftcode user={user} onUpdateUser={updateUser} />;
       case AppView.REFERRAL: return <Referral user={user} />;
+      // Fix: Property 'is_admin' does not exist on type 'User'. Did you mean 'isAdmin'?
       case AppView.ADMIN: return user.isAdmin ? <Admin user={user} onUpdateUser={updateUser} /> : <Dashboard user={user} setView={setCurrentView} />;
       case AppView.GUIDE: return <Guide />;
       case AppView.NOTIFICATIONS: return <UserNotifications user={user} />;
@@ -91,26 +136,26 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex bg-[#06080c] text-slate-200 selection:bg-blue-600/20">
-      <aside className={`fixed inset-y-0 left-0 z-50 w-72 glass-card border-r border-white/5 transform transition-transform md:relative md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full shadow-none'}`}>
+    <div className="min-h-screen flex bg-[#06080c] text-slate-200">
+      {/* Sidebar */}
+      <aside className={`fixed inset-y-0 left-0 z-50 w-72 glass-card border-r border-white/5 transform transition-transform md:relative md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="h-full flex flex-col p-8">
           <div className="flex items-center gap-4 mb-12 px-2">
-             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-700 to-purple-800 flex items-center justify-center shadow-xl shadow-blue-600/20">
-                <Sparkles className="w-7 h-7 text-white" />
-             </div>
+             <Sparkles className="w-10 h-10 text-blue-500" />
              <div>
-               <h2 className="font-black text-xl text-white italic leading-none">NOVA</h2>
-               <span className="text-[9px] font-black text-blue-500 tracking-widest uppercase">VISION 1.0</span>
+               <h2 className="font-black text-xl text-white italic">NOVA</h2>
+               <span className="text-[9px] font-black text-blue-500 tracking-widest uppercase">CLOUD SYNC v1</span>
              </div>
           </div>
           
-          <nav className="flex-1 space-y-2 no-scrollbar overflow-y-auto">
+          <nav className="flex-1 space-y-2 overflow-y-auto no-scrollbar">
             {NAV_ITEMS.map(item => {
+              // Fix: Property 'is_admin' does not exist on type 'User'. Did you mean 'isAdmin'?
               if (item.adminOnly && !user?.isAdmin) return null;
               const active = currentView === item.id;
               return (
-                <button key={item.id} onClick={() => { setCurrentView(item.id); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl transition-all border ${active ? 'bg-gradient-to-r from-blue-600 to-indigo-700 text-white border-blue-500/20 shadow-xl shadow-blue-600/10' : 'text-slate-500 hover:text-white hover:bg-white/5 border-transparent'}`}>
-                  <div className={active ? 'text-white' : ''}>{React.cloneElement(item.icon as any, { className: 'w-5 h-5' })}</div>
+                <button key={item.id} onClick={() => { setCurrentView(item.id); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl transition-all ${active ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500 hover:bg-white/5'}`}>
+                  {React.cloneElement(item.icon as any, { className: 'w-5 h-5' })}
                   <span className="font-black text-[11px] uppercase tracking-widest italic">{item.label}</span>
                 </button>
               );
@@ -119,51 +164,40 @@ const App: React.FC = () => {
 
           <div className="mt-auto pt-8 border-t border-white/5">
              <div className="flex items-center gap-4 px-3 mb-8">
-               <div className="w-12 h-12 bg-gradient-to-tr from-amber-400 via-red-600 to-purple-800 rounded-2xl flex items-center justify-center font-black text-white border border-white/10 shadow-inner text-lg drop-shadow-md">
-                 {user?.fullname.charAt(0)}
-               </div>
-               <div className="flex flex-col overflow-hidden">
-                 <span className="text-xs font-black text-white uppercase italic truncate">{user?.fullname}</span>
-                 <span className={`text-[8px] font-bold ${user?.isAdmin ? 'text-amber-500 animate-pulse' : 'text-blue-500'}`}>{user?.isAdmin ? 'MASTER ADMIN' : 'ELITE MEMBER'}</span>
+               <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center font-black text-white">{user?.fullname.charAt(0)}</div>
+               <div className="flex flex-col">
+                 <span className="text-xs font-black text-white uppercase truncate">{user?.fullname}</span>
+                 <div className="flex items-center gap-2">
+                    <div className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
+                    <span className="text-[8px] text-slate-500 uppercase">{isOnline ? 'Connected' : 'Offline'}</span>
+                 </div>
                </div>
              </div>
-             <button onClick={logout} className="w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-red-500 font-black hover:bg-red-500/10 transition-all uppercase text-[10px] tracking-widest italic border border-transparent hover:border-red-500/20">
-               <LogOut className="w-5 h-5" /> THOÁT RA
+             <button onClick={logout} className="w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-red-500 font-black hover:bg-red-500/10 transition-all uppercase text-[10px] italic">
+               <LogOut className="w-5 h-5" /> THOÁT
              </button>
           </div>
         </div>
       </aside>
 
+      {/* Main Content */}
       <main className="flex-1 overflow-y-auto p-4 md:p-10 relative">
-        <div className="md:hidden flex items-center justify-between mb-10 glass-card p-6 rounded-[2.5rem] border border-white/10 shadow-lg">
-           <div className="flex items-center gap-4">
-             <Sparkles className="w-7 h-7 text-blue-500" />
-             <span className="font-black text-lg italic text-white uppercase tracking-tighter">DIAMOND NOVA</span>
-           </div>
-           <button onClick={() => setIsSidebarOpen(true)} className="p-3 bg-slate-900 rounded-2xl text-white"><Menu className="w-6 h-6" /></button>
+        <div className="md:hidden flex items-center justify-between mb-8 glass-card p-4 rounded-2xl">
+           <Sparkles className="w-7 h-7 text-blue-500" />
+           <button onClick={() => setIsSidebarOpen(true)} className="p-2 bg-slate-900 rounded-xl text-white"><Menu className="w-6 h-6" /></button>
         </div>
         
-        <div className="max-w-6xl mx-auto pb-20 relative">
+        <div className="max-w-6xl mx-auto">
           {renderView()}
-          
-          <div className="absolute bottom-[-4rem] right-0 text-[9px] font-black text-slate-700 uppercase tracking-widest italic">
-            © hoangmaianhvu-dev-bot-web • VISION 1.0
-          </div>
         </div>
 
-        {/* Floating AI Bubble */}
-        <button 
-          onClick={() => setCurrentView(AppView.SUPPORT)}
-          className={`fixed bottom-10 right-10 w-16 h-16 rounded-full bg-gradient-to-br from-violet-600 to-indigo-800 text-white flex items-center justify-center shadow-[0_0_30px_rgba(99,102,241,0.5)] border-2 border-white/20 transition-all hover:scale-110 active:scale-90 group z-[60] ${currentView === AppView.SUPPORT ? 'hidden' : 'flex'}`}
-        >
-          <Bot className="w-8 h-8 group-hover:animate-bounce" />
-          <div className="absolute right-full mr-4 bg-slate-900 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest italic whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none border border-white/10 shadow-2xl">
-             Hỏi AI Gemini ✨
+        {/* Global Alert for New Notifs */}
+        {hasNewNotif && (
+          <div className="fixed top-10 left-1/2 -translate-x-1/2 z-[100] bg-blue-600 text-white px-8 py-4 rounded-full font-black text-xs uppercase tracking-widest italic shadow-2xl flex items-center gap-4 animate-bounce">
+            <Bell className="w-5 h-5" /> CÓ THÔNG BÁO MỚI TỪ HỆ THỐNG!
           </div>
-        </button>
+        )}
       </main>
-
-      {isSidebarOpen && <div className="fixed inset-0 z-40 bg-black/80 backdrop-blur-md md:hidden" onClick={() => setIsSidebarOpen(false)}></div>}
     </div>
   );
 };

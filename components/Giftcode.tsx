@@ -20,12 +20,13 @@ const Giftcode: React.FC<Props> = ({ user, onUpdateUser }) => {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [msg, setMsg] = useState('');
 
-  const handleClaim = () => {
+  const handleClaim = async () => {
     if (!code.trim()) return;
     setStatus('loading');
     
-    setTimeout(() => {
-      const allGiftcodes = dbService.getGiftcodes();
+    setTimeout(async () => {
+      // Fix: dbService.getGiftcodes is async.
+      const allGiftcodes = await dbService.getGiftcodes();
       const gc = allGiftcodes.find(g => g.code.toUpperCase() === code.trim().toUpperCase());
 
       if (!gc) {
@@ -42,7 +43,8 @@ const Giftcode: React.FC<Props> = ({ user, onUpdateUser }) => {
         const updatedCodes = allGiftcodes.map(g => 
           g.code === gc.code ? { ...g, usedBy: [...g.usedBy, user.id] } : g
         );
-        dbService.saveGiftcodes(updatedCodes);
+        // Fix: dbService.saveGiftcodes is async.
+        await dbService.saveGiftcodes(updatedCodes);
         
         const updatedUser = { ...user, balance: user.balance + gc.amount };
         onUpdateUser(updatedUser);
@@ -57,7 +59,7 @@ const Giftcode: React.FC<Props> = ({ user, onUpdateUser }) => {
   return (
     <div className="max-w-2xl mx-auto py-10 animate-in fade-in duration-500">
       <div className="glass-card rounded-[2.5rem] p-10 relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none pointer-events-none">
+        <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
           <Ticket className="w-48 h-48 text-rose-500" />
         </div>
 

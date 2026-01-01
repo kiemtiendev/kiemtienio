@@ -29,6 +29,8 @@ const Login: React.FC<Props> = ({ onLoginSuccess }) => {
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [isAuthMenuOpen, setIsAuthMenuOpen] = useState(false);
+  // Add state for total users count as it's fetched asynchronously
+  const [totalUsersCount, setTotalUsersCount] = useState(0);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -37,11 +39,14 @@ const Login: React.FC<Props> = ({ onLoginSuccess }) => {
       setReferralCode(ref.toUpperCase());
       setAuthMode('signup');
     }
+    // Fetch total users count on mount
+    dbService.getTotalUserCount().then(setTotalUsersCount);
   }, []);
 
-  const handleLogin = (e: React.FormEvent) => {
+  // Use async/await for login handler
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const u = dbService.login(email, password);
+    const u = await dbService.login(email, password);
     if (u) {
       onLoginSuccess(u);
     } else {
@@ -49,10 +54,11 @@ const Login: React.FC<Props> = ({ onLoginSuccess }) => {
     }
   };
 
-  const handleSignup = (e: React.FormEvent) => {
+  // Use async/await for signup handler
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !email || !password) return setError('Vui lòng điền đủ thông tin!');
-    const res = dbService.signup(email, password, name, referralCode);
+    const res = await dbService.signup(email, password, name, referralCode);
     if (res.success) {
       setAuthMode('login');
       setError('');
@@ -61,8 +67,6 @@ const Login: React.FC<Props> = ({ onLoginSuccess }) => {
       setError(res.message);
     }
   };
-
-  const totalUsersCount = dbService.getTotalUserCount();
 
   return (
     <div className="min-h-screen bg-[#06080c] flex flex-col items-center relative overflow-hidden">

@@ -1,338 +1,303 @@
 
-import { User, Giftcode, WithdrawalRequest, AdminNotification, AccountRecord, Announcement, AdBanner, ActivityLog } from '../types.ts';
+import { createClient } from '@supabase/supabase-js';
+import { User, Giftcode, WithdrawalRequest, AdminNotification, Announcement, AdBanner, ActivityLog } from '../types.ts';
 import { REFERRAL_REWARD, RATE_VND_TO_POINT } from '../constants.tsx';
 
-const STORAGE_KEY_USER = 'diamond_earn_user_session';
-const STORAGE_KEY_ACCOUNTS = 'diamond_earn_accounts'; 
-const STORAGE_KEY_GIFTCODES = 'diamond_earn_giftcodes';
-const STORAGE_KEY_WITHDRAWALS = 'diamond_earn_withdrawals';
-const STORAGE_KEY_ALL_USERS = 'diamond_earn_all_users';
-const STORAGE_KEY_NOTIFICATIONS = 'diamond_earn_notifications';
-const STORAGE_KEY_ANNOUNCEMENTS = 'diamond_earn_announcements';
-const STORAGE_KEY_ADS = 'diamond_earn_ads';
-const STORAGE_KEY_LOGS = 'diamond_earn_activity_logs';
+// Khởi tạo Supabase Client
+const supabaseUrl = process.env.SUPABASE_URL || '';
+const supabaseKey = process.env.SUPABASE_ANON_KEY || '';
+export const supabase = createClient(supabaseUrl, supabaseKey);
+
+// Mapping function to convert DB snake_case to Frontend camelCase
+const mapUser = (u: any): User => {
+  if (!u) return null as any;
+  return {
+    ...u,
+    totalEarned: u.total_earned ?? 0,
+    isBanned: u.is_banned ?? false,
+    isAdmin: u.is_admin ?? false,
+    joinDate: u.join_date,
+    lastTaskDate: u.last_task_date,
+    lastLogin: u.last_login,
+    referralCount: u.referral_count ?? 0,
+    referralBonus: u.referral_bonus ?? 0,
+    referredBy: u.referred_by,
+    taskCounts: u.task_counts || {}
+  };
+};
 
 export const dbService = {
-  // ... (giữ nguyên logic gốc của bạn)
-  signup: (email: string, pass: string, fullname: string, refId?: string): { success: boolean, message: string } => {
-    const accounts: AccountRecord[] = JSON.parse(localStorage.getItem(STORAGE_KEY_ACCOUNTS) || '[]');
-    if (accounts.find(a => a.email === email)) return { success: false, message: 'Email đã tồn tại!' };
+  // --- AUTH ---
+  signup: async (email: string, pass: string, fullname: string, refId?: string) => {
+    // Kiểm tra tồn tại
+    const { data: existing } = await supabase.from('users').select('id').eq('email', email).single();
+    if (existing) return { success: false, message: 'Email đã tồn tại!' };
 
-    const allUsers = dbService.getAllUsers();
-    const isFirstUser = allUsers.length === 0;
     const userId = Math.random().toString(36).substr(2, 9).toUpperCase();
+    const { count } = await supabase.from('users').select('id', { count: 'exact', head: true });
+    const isFirst = (count || 0) === 0;
 
-    const newUser: User = {
+    const newUser = {
       id: userId,
       email,
+      password_hash: btoa(pass), // Demo: Nên dùng auth thực tế của Supabase
       fullname: fullname.toUpperCase(),
-      bankInfo: '',
-      idGame: '',
       balance: 0,
-      totalEarned: 0,
-      tasksToday: 0,
-      tasksWeek: 0,
-      taskCounts: {},
-      joinDate: new Date().toLocaleDateString('vi-VN'),
-      lastTaskDate: '',
-      isBanned: false,
-      isAdmin: isFirstUser,
-      referralCount: 0,
-      referralBonus: 0,
-      referredBy: refId || ''
+      total_earned: 0,
+      is_admin: isFirst,
+      is_banned: false,
+      join_date: new Date().toISOString(),
+      referred_by: refId || null
     };
 
+    const { error } = await supabase.from('users').insert([newUser]);
+    if (error) return { success: false, message: error.message };
+
+    // Xử lý referral bonus
     if (refId) {
-      const referrer = allUsers.find(u => u.id === refId);
-      if (referrer) {
-        referrer.balance += REFERRAL_REWARD;
-        referrer.totalEarned += REFERRAL_REWARD;
-        referrer.referralCount = (referrer.referralCount || 0) + 1;
-        referrer.referralBonus = (referrer.referralBonus || 0) + REFERRAL_REWARD;
-        
-        dbService.addNotification({
-          type: 'referral',
-          title: 'THƯỞNG GIỚI THIỆU MỚI',
-          content: `Bạn nhận được +${REFERRAL_REWARD.toLocaleString()} P từ việc mời thành viên ${fullname.toUpperCase()}`,
-          userId: referrer.id,
-          userName: referrer.fullname
-        });
+      const { data: refUser } = await supabase.from('users').select('*').eq('id', refId).single();
+      if (refUser) {
+        await supabase.from('users').update({
+          balance: refUser.balance + REFERRAL_REWARD,
+          total_earned: (refUser.total_earned || 0) + REFERRAL_REWARD,
+          referral_count: (refUser.referral_count || 0) + 1,
+          referral_bonus: (refUser.referral_bonus || 0) + REFERRAL_REWARD
+        }).eq('id', refId);
       }
     }
 
-    accounts.push({ email, passwordHash: btoa(pass), userId });
-    localStorage.setItem(STORAGE_KEY_ACCOUNTS, JSON.stringify(accounts));
+    await dbService.addNotification({
+      type: 'auth',
+      title: 'HỘI VIÊN MỚI',
+      content: `${fullname.toUpperCase()} vừa gia nhập hệ thống.`,
+      userId: userId,
+      userName: fullname.toUpperCase()
+    });
 
-    allUsers.push(newUser);
-    localStorage.setItem(STORAGE_KEY_ALL_USERS, JSON.stringify(allUsers));
-    
-    dbService.logActivity(userId, fullname.toUpperCase(), 'Đăng ký', 'Tạo tài khoản mới thành công');
-    
     return { success: true, message: 'Đăng ký thành công!' };
   },
 
-  login: (email: string, pass: string): User | null => {
-    const accounts: AccountRecord[] = JSON.parse(localStorage.getItem(STORAGE_KEY_ACCOUNTS) || '[]');
-    const acc = accounts.find(a => a.email === email && a.passwordHash === btoa(pass));
-    if (!acc) return null;
-    
-    const all = dbService.getAllUsers();
-    const userIndex = all.findIndex(u => u.id === acc.userId);
-    if (userIndex > -1) {
-      all[userIndex].lastLogin = new Date().toISOString();
-      localStorage.setItem(STORAGE_KEY_ALL_USERS, JSON.stringify(all));
-      
-      const user = all[userIndex];
-      localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
-      
-      dbService.logActivity(user.id, user.fullname, 'Đăng nhập', 'Truy cập vào hệ thống');
-      return user;
-    }
-    return null;
+  login: async (email: string, pass: string) => {
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .eq('password_hash', btoa(pass))
+      .single();
+
+    if (error || !user) return null;
+
+    localStorage.setItem('nova_session_id', user.id);
+    return mapUser(user);
+  },
+
+  getCurrentUser: async () => {
+    const id = localStorage.getItem('nova_session_id');
+    if (!id) return null;
+    const { data: user } = await supabase.from('users').select('*').eq('id', id).single();
+    return user ? mapUser(user) : null;
   },
 
   logout: () => {
-    const user = dbService.getCurrentUser();
-    if (user) {
-      dbService.logActivity(user.id, user.fullname, 'Đăng xuất', 'Thoát khỏi hệ thống');
+    localStorage.removeItem('nova_session_id');
+  },
+
+  getTotalUserCount: async () => {
+    const { count } = await supabase.from('users').select('*', { count: 'exact', head: true });
+    return count || 0;
+  },
+
+  // --- USER DATA ---
+  updateUser: async (id: string, updates: Partial<User>) => {
+    const dbUpdates: any = { ...updates };
+    if (updates.totalEarned !== undefined) dbUpdates.total_earned = updates.totalEarned;
+    if (updates.isBanned !== undefined) dbUpdates.is_banned = updates.isBanned;
+    if (updates.isAdmin !== undefined) dbUpdates.is_admin = updates.isAdmin;
+    if (updates.lastTaskDate !== undefined) dbUpdates.last_task_date = updates.lastTaskDate;
+    if (updates.taskCounts !== undefined) dbUpdates.task_counts = updates.taskCounts;
+    
+    await supabase.from('users').update(dbUpdates).eq('id', id);
+  },
+
+  getAllUsers: async () => {
+    const { data } = await supabase.from('users').select('*').order('balance', { ascending: false });
+    return (data || []).map(mapUser);
+  },
+
+  // --- WITHDRAWALS ---
+  getWithdrawals: async (userId?: string) => {
+    let query = supabase.from('withdrawals').select('*').order('created_at', { ascending: false });
+    if (userId) query = query.eq('user_id', userId);
+    const { data } = await query;
+    return (data || []).map(w => ({
+      ...w,
+      userId: w.user_id,
+      userName: w.user_name,
+      createdAt: w.created_at
+    }));
+  },
+
+  addWithdrawal: async (req: Partial<WithdrawalRequest>) => {
+    const { error } = await supabase.from('withdrawals').insert([{
+      user_id: req.userId,
+      user_name: req.userName,
+      amount: req.amount,
+      type: req.type,
+      status: 'pending',
+      details: req.details,
+      created_at: new Date().toISOString()
+    }]);
+    
+    if (!error) {
+      await dbService.addNotification({
+        type: 'withdrawal',
+        title: 'YÊU CẦU RÚT TIỀN',
+        content: `Hội viên ${req.userName} vừa yêu cầu rút ${req.amount?.toLocaleString()}đ`,
+        userId: req.userId,
+        userName: req.userName
+      });
     }
-    localStorage.removeItem(STORAGE_KEY_USER);
   },
 
-  getCurrentUser: (): User | null => {
-    const data = localStorage.getItem(STORAGE_KEY_USER);
-    if (!data) return null;
-    const sessionUser = JSON.parse(data);
-    const all = dbService.getAllUsers();
-    return all.find(u => u.id === sessionUser.id) || null;
-  },
-
-  updateCurrentUser: (user: User) => {
-    const all = dbService.getAllUsers();
-    const index = all.findIndex(u => u.id === user.id);
-    if (index > -1) {
-      all[index] = user;
-      localStorage.setItem(STORAGE_KEY_ALL_USERS, JSON.stringify(all));
-      localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
+  updateWithdrawalStatus: async (id: string, status: string, userId?: string, amount?: number) => {
+    await supabase.from('withdrawals').update({ status }).eq('id', id);
+    if (status === 'rejected' && userId && amount) {
+      const { data: user } = await supabase.from('users').select('balance').eq('id', userId).single();
+      if (user) {
+        await supabase.from('users').update({ balance: user.balance + (amount * RATE_VND_TO_POINT) }).eq('id', userId);
+      }
     }
   },
 
-  getAllUsers: (): User[] => {
-    const data = localStorage.getItem(STORAGE_KEY_ALL_USERS);
-    return data ? JSON.parse(data) : [];
+  // --- NOTIFICATIONS ---
+  getNotifications: async (userId?: string) => {
+    let query = supabase.from('notifications').select('*').order('created_at', { ascending: false });
+    if (userId) query = query.or(`user_id.eq.${userId},user_id.eq.all`);
+    const { data } = await query;
+    return (data || []).map(n => ({
+      ...n,
+      userId: n.user_id,
+      userName: n.user_name,
+      isRead: n.is_read,
+      createdAt: n.created_at
+    }));
   },
 
-  getTotalUserCount: (): number => dbService.getAllUsers().length + 1540,
+  addNotification: async (notif: Partial<AdminNotification>) => {
+    await supabase.from('notifications').insert([{
+      type: notif.type,
+      title: notif.title,
+      content: notif.content,
+      user_id: notif.userId || 'all',
+      user_name: notif.userName || 'System',
+      is_read: false,
+      created_at: new Date().toISOString()
+    }]);
+  },
 
-  adminUpdateUser: (updatedUser: User) => {
-    const all = dbService.getAllUsers();
-    const index = all.findIndex(u => u.id === updatedUser.id);
-    if (index > -1) {
-      all[index] = updatedUser;
-      localStorage.setItem(STORAGE_KEY_ALL_USERS, JSON.stringify(all));
-      return true;
+  markNotificationRead: async (id: string) => {
+    await supabase.from('notifications').update({ is_read: true }).eq('id', id);
+  },
+
+  deleteNotification: async (id: string) => {
+    await supabase.from('notifications').delete().eq('id', id);
+  },
+
+  clearAllNotifications: async () => {
+    await supabase.from('notifications').delete().neq('id', '0');
+  },
+
+  // --- ANNOUNCEMENTS & ADS ---
+  getAnnouncements: async () => {
+    const { data } = await supabase.from('announcements').select('*').order('created_at', { ascending: false });
+    return (data || []).map(a => ({
+      ...a,
+      createdAt: a.created_at
+    }));
+  },
+
+  saveAnnouncement: async (ann: any) => {
+    const dbAnn = {
+      title: ann.title,
+      content: ann.content,
+      priority: ann.priority || 'low',
+      created_at: ann.createdAt || new Date().toISOString()
+    };
+    await supabase.from('announcements').insert([dbAnn]);
+  },
+
+  getAds: async (includeInactive = false) => {
+    let query = supabase.from('ads').select('*');
+    if (!includeInactive) query = query.eq('is_active', true);
+    const { data } = await query;
+    return (data || []).map(ad => ({
+      ...ad,
+      imageUrl: ad.image_url,
+      targetUrl: ad.target_url,
+      isActive: ad.is_active,
+      isHidden: ad.is_hidden
+    }));
+  },
+
+  saveAd: async (ad: any) => {
+    const dbAd = {
+      title: ad.title,
+      image_url: ad.imageUrl,
+      target_url: ad.targetUrl,
+      is_active: ad.isActive ?? true,
+      is_hidden: ad.isHidden ?? false
+    };
+    await supabase.from('ads').upsert([dbAd]);
+  },
+
+  // --- GIFTCODES ---
+  getGiftcodes: async () => {
+    const { data } = await supabase.from('giftcodes').select('*').order('created_at', { ascending: false });
+    return (data || []).map(g => ({
+      ...g,
+      maxUses: g.max_uses,
+      usedBy: g.used_by || [],
+      createdAt: g.created_at
+    }));
+  },
+
+  addGiftcode: async (gc: any) => {
+    await supabase.from('giftcodes').insert([{
+      code: gc.code,
+      amount: gc.amount,
+      max_uses: gc.maxUses,
+      used_by: [],
+      created_at: new Date().toISOString()
+    }]);
+  },
+
+  saveGiftcodes: async (codes: Giftcode[]) => {
+    // This is a bulk update helper
+    for (const gc of codes) {
+      await supabase.from('giftcodes').update({
+        used_by: gc.usedBy
+      }).eq('code', gc.code);
     }
-    return false;
   },
 
-  logActivity: (userId: string, userName: string, action: string, details: string) => {
-    const logs: ActivityLog[] = JSON.parse(localStorage.getItem(STORAGE_KEY_LOGS) || '[]');
-    const newLog: ActivityLog = {
-      id: Math.random().toString(36).substr(2, 9),
-      userId,
-      userName,
+  // --- LOGS ---
+  logActivity: async (userId: string, userName: string, action: string, details: string) => {
+    await supabase.from('activity_logs').insert([{
+      user_id: userId,
+      user_name: userName,
       action,
       details,
-      createdAt: new Date().toISOString()
-    };
-    logs.unshift(newLog);
-    localStorage.setItem(STORAGE_KEY_LOGS, JSON.stringify(logs.slice(0, 1000)));
+      created_at: new Date().toISOString()
+    }]);
   },
 
-  getActivityLogs: (): ActivityLog[] => {
-    const data = localStorage.getItem(STORAGE_KEY_LOGS);
-    return data ? JSON.parse(data) : [];
-  },
-
-  getAds: (includeHidden = false): AdBanner[] => {
-    const data = localStorage.getItem(STORAGE_KEY_ADS);
-    let all: AdBanner[] = data ? JSON.parse(data) : [];
-    
-    if (all.length === 0) {
-      all = [
-        {
-          id: 'default-1',
-          title: 'SHOP ACC FF GIÁ RẺ - UY TÍN SỐ 1',
-          imageUrl: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=2070',
-          targetUrl: 'https://shopee.vn',
-          isActive: true,
-          isHidden: false
-        },
-        {
-          id: 'default-2',
-          title: 'DỊCH VỤ CÀY THUÊ LIÊN QUÂN',
-          imageUrl: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&q=80&w=2071',
-          targetUrl: 'https://zalo.me',
-          isActive: true,
-          isHidden: false
-        }
-      ];
-      localStorage.setItem(STORAGE_KEY_ADS, JSON.stringify(all));
-    }
-    
-    return includeHidden ? all : all.filter(a => !a.isHidden && a.isActive);
-  },
-  saveAd: (ad: AdBanner) => {
-    const all = dbService.getAds(true);
-    all.unshift(ad);
-    localStorage.setItem(STORAGE_KEY_ADS, JSON.stringify(all));
-  },
-  toggleAdVisibility: (id: string) => {
-    const all = dbService.getAds(true);
-    const idx = all.findIndex(a => String(a.id) === String(id));
-    if (idx > -1) {
-      all[idx].isHidden = !all[idx].isHidden;
-      localStorage.setItem(STORAGE_KEY_ADS, JSON.stringify(all));
-      return true;
-    }
-    return false;
-  },
-  deleteAd: (id: string) => {
-    const all = dbService.getAds(true);
-    const filtered = all.filter(a => String(a.id) !== String(id));
-    localStorage.setItem(STORAGE_KEY_ADS, JSON.stringify(filtered));
-  },
-
-  getWithdrawals: (userId?: string): WithdrawalRequest[] => {
-    const data = localStorage.getItem(STORAGE_KEY_WITHDRAWALS);
-    const all: WithdrawalRequest[] = data ? JSON.parse(data) : [];
-    return userId ? all.filter(r => r.userId === userId) : all;
-  },
-  addWithdrawal: (req: WithdrawalRequest) => {
-    const all = dbService.getWithdrawals();
-    const nextIdNumber = all.length;
-    req.id = nextIdNumber.toString().padStart(7, '0');
-    
-    all.unshift(req);
-    localStorage.setItem(STORAGE_KEY_WITHDRAWALS, JSON.stringify(all));
-
-    dbService.logActivity(req.userId, req.userName, 'Rút tiền', `Yêu cầu rút ${req.amount.toLocaleString()}đ qua ${req.type}`);
-
-    dbService.addNotification({
-      type: 'withdrawal',
-      title: `LỆNH RÚT #${req.id}`,
-      content: `User: ${req.userName} | Loại: ${req.type === 'bank' ? 'ATM' : 'Kim cương'} | Số tiền: ${req.amount.toLocaleString()}đ | Info: ${req.details}`,
-      userId: req.userId,
-      userName: req.userName
-    });
-  },
-  updateWithdrawalStatus: (id: string, status: 'pending' | 'completed' | 'rejected', reason?: string) => {
-    console.log(`[DB] Cập nhật đơn #${id} sang ${status}`);
-    const allWithdrawals = dbService.getWithdrawals();
-    const idx = allWithdrawals.findIndex(w => String(w.id) === String(id));
-    
-    if (idx > -1) { 
-      const request = allWithdrawals[idx];
-      request.status = status; 
-      localStorage.setItem(STORAGE_KEY_WITHDRAWALS, JSON.stringify(allWithdrawals)); 
-      
-      if (status === 'rejected') {
-        const allUsers = dbService.getAllUsers();
-        const userIdx = allUsers.findIndex(u => u.id === request.userId);
-        if (userIdx > -1) {
-          const refundPoints = request.amount * RATE_VND_TO_POINT;
-          allUsers[userIdx].balance += refundPoints;
-          localStorage.setItem(STORAGE_KEY_ALL_USERS, JSON.stringify(allUsers));
-          
-          dbService.addNotification({
-            type: 'withdrawal',
-            title: `LỆNH RÚT #${id} BỊ TỪ CHỐI`,
-            content: `Lý do: ${reason || 'Thông tin không chính xác'}. Số điểm ${refundPoints.toLocaleString()} P đã được hoàn lại.`,
-            userId: request.userId,
-            userName: request.userName
-          });
-        }
-      } else if (status === 'completed') {
-        dbService.addNotification({
-          type: 'withdrawal',
-          title: `LỆNH RÚT #${id} THÀNH CÔNG`,
-          content: `Yêu cầu rút ${request.amount.toLocaleString()}đ của bạn đã được thanh toán.`,
-          userId: request.userId,
-          userName: request.userName
-        });
-      }
-
-      dbService.logActivity(request.userId, request.userName, 'Cập nhật rút tiền', `Lệnh rút #${id} chuyển sang: ${status}`);
-      return true;
-    }
-    console.error(`[DB] Không tìm thấy đơn #${id} để cập nhật!`);
-    return false;
-  },
-
-  getAnnouncements: (): Announcement[] => {
-    const data = localStorage.getItem(STORAGE_KEY_ANNOUNCEMENTS);
-    return data ? JSON.parse(data) : [];
-  },
-  saveAnnouncement: (ann: Announcement) => {
-    const all = dbService.getAnnouncements();
-    all.unshift(ann);
-    localStorage.setItem(STORAGE_KEY_ANNOUNCEMENTS, JSON.stringify(all));
-  },
-  deleteAnnouncement: (id: string) => {
-    const all = dbService.getAnnouncements();
-    const filtered = all.filter(a => String(a.id) !== String(id));
-    localStorage.setItem(STORAGE_KEY_ANNOUNCEMENTS, JSON.stringify(filtered));
-  },
-
-  getGiftcodes: (): Giftcode[] => JSON.parse(localStorage.getItem(STORAGE_KEY_GIFTCODES) || '[]'),
-  saveGiftcodes: (codes: Giftcode[]) => localStorage.setItem(STORAGE_KEY_GIFTCODES, JSON.stringify(codes)),
-  addGiftcode: (gc: Giftcode) => { 
-    const all = dbService.getGiftcodes(); 
-    all.unshift(gc); 
-    dbService.saveGiftcodes(all); 
-  },
-  deleteGiftcode: (c: string) => { 
-    const all = dbService.getGiftcodes();
-    const filtered = all.filter(g => g.code !== c); 
-    dbService.saveGiftcodes(filtered); 
-  },
-
-  getNotifications: (): AdminNotification[] => {
-    const data = localStorage.getItem(STORAGE_KEY_NOTIFICATIONS);
-    return data ? JSON.parse(data) : [];
-  },
-  addNotification: (notif: Partial<AdminNotification>) => {
-    const all = dbService.getNotifications();
-    const newNotif: AdminNotification = {
-      id: Math.random().toString(36).substr(2, 9),
-      type: notif.type || 'system',
-      title: notif.title || '',
-      content: notif.content || '',
-      userId: notif.userId || '',
-      userName: notif.userName || '',
-      isRead: false,
-      createdAt: new Date().toISOString()
-    };
-    all.unshift(newNotif);
-    localStorage.setItem(STORAGE_KEY_NOTIFICATIONS, JSON.stringify(all));
-  },
-  markNotificationRead: (id: string) => {
-    const all = dbService.getNotifications();
-    const index = all.findIndex(n => String(n.id) === String(id));
-    if (index > -1) {
-      all[index].isRead = true;
-      localStorage.setItem(STORAGE_KEY_NOTIFICATIONS, JSON.stringify(all));
-    }
-  },
-  markAllNotificationsRead: () => {
-    const all = dbService.getNotifications().map(n => ({ ...n, isRead: true }));
-    localStorage.setItem(STORAGE_KEY_NOTIFICATIONS, JSON.stringify(all));
-  },
-  deleteNotification: (id: string) => {
-    const all = dbService.getNotifications().filter(n => String(n.id) !== String(id));
-    localStorage.setItem(STORAGE_KEY_NOTIFICATIONS, JSON.stringify(all));
-  },
-  clearAllNotifications: () => {
-    localStorage.setItem(STORAGE_KEY_NOTIFICATIONS, JSON.stringify([]));
+  getActivityLogs: async () => {
+    const { data } = await supabase.from('activity_logs').select('*').order('created_at', { ascending: false }).limit(100);
+    return (data || []).map(l => ({
+      ...l,
+      userId: l.user_id,
+      userName: l.user_name,
+      createdAt: l.created_at
+    }));
   }
 };

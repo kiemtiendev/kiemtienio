@@ -55,15 +55,16 @@ const Support: React.FC = () => {
     setIsLoading(false);
   };
 
-  const reportToAdmin = () => {
+  const reportToAdmin = async () => {
     const lastUserMsg = [...messages].reverse().find(m => m.sender === 'user');
     if (!lastUserMsg) return;
 
-    const user = dbService.getCurrentUser();
+    // Fix: dbService.getCurrentUser is async.
+    const user = await dbService.getCurrentUser();
     // Safety check: ensure user is logged in
     if (!user) return;
 
-    dbService.addNotification({
+    await dbService.addNotification({
       type: 'feedback',
       title: 'Phản hồi từ người dùng',
       content: `Người dùng ${user.fullname} cần hỗ trợ: "${lastUserMsg.text}"`,

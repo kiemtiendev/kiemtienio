@@ -1,5 +1,5 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { dbService } from '../services/dbService.ts';
 import { formatK } from '../constants.tsx';
 import { 
@@ -12,23 +12,32 @@ import {
   Users,
   Sparkles
 } from 'lucide-react';
+import { User } from '../types.ts';
 
 const Leaderboard: React.FC = () => {
-  const users = useMemo(() => {
-    const all = dbService.getAllUsers()
-      .filter(u => !u.isBanned)
-      .sort((a, b) => (b.balance || 0) - (a.balance || 0));
-    
-    if (all.length === 0) {
-      return [
-        { fullname: 'NOVA MASTER', balance: 5000000 },
-        { fullname: 'ELITE WARRIOR', balance: 3500000 },
-        { fullname: 'DIAMOND KING', balance: 2800000 },
-        { fullname: 'CRYPTO MINER', balance: 1200000 },
-        { fullname: 'TASK HUNTER', balance: 950000 },
-      ];
-    }
-    return all.slice(0, 10);
+  const [users, setUsers] = useState<Partial<User>[]>([]);
+
+  // Fix: dbService.getAllUsers is async.
+  useEffect(() => {
+    const fetchUsers = async () => {
+      const all = await dbService.getAllUsers();
+      const sorted = all
+        .filter(u => !u.isBanned)
+        .sort((a, b) => (b.balance || 0) - (a.balance || 0));
+      
+      if (sorted.length === 0) {
+        setUsers([
+          { fullname: 'NOVA MASTER', balance: 5000000 },
+          { fullname: 'ELITE WARRIOR', balance: 3500000 },
+          { fullname: 'DIAMOND KING', balance: 2800000 },
+          { fullname: 'CRYPTO MINER', balance: 1200000 },
+          { fullname: 'TASK HUNTER', balance: 950000 },
+        ]);
+      } else {
+        setUsers(sorted.slice(0, 10));
+      }
+    };
+    fetchUsers();
   }, []);
 
   const top1 = users[0] || { fullname: 'Chưa có', balance: 0 };
@@ -67,7 +76,7 @@ const Leaderboard: React.FC = () => {
           <h3 className="mt-12 font-black text-2xl text-white mb-2 uppercase italic truncate w-full px-4">{top2.fullname}</h3>
           <div className="flex items-center gap-2 mb-4">
              <Star className="w-4 h-4 text-slate-400" />
-             <p className="text-slate-200 font-black text-3xl italic tracking-tighter">{formatK(top2.balance)}</p>
+             <p className="text-slate-200 font-black text-3xl italic tracking-tighter">{formatK(top2.balance as number)}</p>
              <span className="text-slate-500 font-black text-xs uppercase">P</span>
           </div>
         </div>
@@ -83,7 +92,7 @@ const Leaderboard: React.FC = () => {
           <h3 className="mt-14 font-black text-3xl text-white mb-2 uppercase italic truncate w-full px-4">{top1.fullname}</h3>
           <div className="flex items-center gap-2 mb-6">
              <Sparkles className="w-6 h-6 text-amber-400 animate-bounce" />
-             <p className="text-amber-400 font-black text-5xl italic tracking-tighter">{formatK(top1.balance)}</p>
+             <p className="text-amber-400 font-black text-5xl italic tracking-tighter">{formatK(top1.balance as number)}</p>
              <span className="text-amber-600 font-black text-lg uppercase">P</span>
           </div>
         </div>
@@ -99,7 +108,7 @@ const Leaderboard: React.FC = () => {
           <h3 className="mt-12 font-black text-2xl text-white mb-2 uppercase italic truncate w-full px-4">{top3.fullname}</h3>
           <div className="flex items-center gap-2 mb-4">
              <Star className="w-4 h-4 text-orange-500" />
-             <p className="text-slate-200 font-black text-3xl italic tracking-tighter">{formatK(top3.balance)}</p>
+             <p className="text-slate-200 font-black text-3xl italic tracking-tighter">{formatK(top3.balance as number)}</p>
              <span className="text-slate-500 font-black text-xs uppercase">P</span>
           </div>
         </div>
@@ -133,13 +142,13 @@ const Leaderboard: React.FC = () => {
                   </td>
                   <td className="px-10 py-8">
                     <div className="flex items-center gap-5">
-                      <div className="w-12 h-12 bg-slate-800 rounded-2xl flex items-center justify-center text-sm font-black text-white italic border border-white/10">{user.fullname.charAt(0)}</div>
+                      <div className="w-12 h-12 bg-slate-800 rounded-2xl flex items-center justify-center text-sm font-black text-white italic border border-white/10">{user.fullname?.charAt(0)}</div>
                       <span className="font-black text-slate-200 uppercase italic text-base group-hover:text-white transition-colors">{user.fullname}</span>
                     </div>
                   </td>
                   <td className="px-10 py-8 text-right">
                     <div className="flex items-center justify-end gap-3">
-                      <span className="font-black text-2xl text-white italic tracking-tighter">{formatK(user.balance)}</span>
+                      <span className="font-black text-2xl text-white italic tracking-tighter">{formatK(user.balance as number)}</span>
                       <div className="p-2 bg-blue-500/10 rounded-xl text-blue-500">
                         <ArrowUp className="w-4 h-4" />
                       </div>

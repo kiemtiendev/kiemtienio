@@ -17,12 +17,21 @@ const Withdraw: React.FC<Props> = ({ user, onUpdateUser, initialHistory = false 
   const [selectedMilestone, setSelectedMilestone] = useState<number | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [history, setHistory] = useState<WithdrawalRequest[]>([]);
 
   useEffect(() => {
     setShowHistory(initialHistory);
   }, [initialHistory]);
 
-  const history = dbService.getWithdrawals(user.id);
+  // Fix: dbService.getWithdrawals returns a Promise.
+  useEffect(() => {
+    const fetchHistory = async () => {
+      const data = await dbService.getWithdrawals(user.id);
+      setHistory(data);
+    };
+    fetchHistory();
+  }, [user.id]);
+
   const pointsNeeded = selectedMilestone ? selectedMilestone * RATE_VND_TO_POINT : 0;
   const canAfford = user.balance >= pointsNeeded;
 
@@ -31,15 +40,14 @@ const Withdraw: React.FC<Props> = ({ user, onUpdateUser, initialHistory = false 
     return Math.floor((vnd * RATE_VND_TO_POINT) / POINT_PER_DIAMOND);
   };
 
-  const handleWithdraw = () => {
+  const handleWithdraw = async () => {
     if (!method || !selectedMilestone || !canAfford) return;
     const info = method === 'bank' ? user.bankInfo : user.idGame;
     if (!info) return alert(`Hãy cập nhật thông tin ${method === 'bank' ? 'ATM' : 'ID Game'} trong mục Hồ sơ.`);
     
     setIsProcessing(true);
-    setTimeout(() => {
-      const request: WithdrawalRequest = {
-        id: '', 
+    setTimeout(async () => {
+      const request: Partial<WithdrawalRequest> = {
         userId: user.id,
         userName: user.fullname,
         amount: selectedMilestone,
@@ -48,7 +56,7 @@ const Withdraw: React.FC<Props> = ({ user, onUpdateUser, initialHistory = false 
         details: info,
         createdAt: new Date().toISOString()
       };
-      dbService.addWithdrawal(request);
+      await dbService.addWithdrawal(request);
       
       onUpdateUser({ ...user, balance: user.balance - pointsNeeded });
       
@@ -56,6 +64,9 @@ const Withdraw: React.FC<Props> = ({ user, onUpdateUser, initialHistory = false 
       setIsSuccess(true);
       setMethod(null);
       setSelectedMilestone(null);
+      // Refresh history after adding a new one
+      const data = await dbService.getWithdrawals(user.id);
+      setHistory(data);
     }, 1500);
   };
 

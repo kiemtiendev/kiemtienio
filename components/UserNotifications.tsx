@@ -1,5 +1,5 @@
 
-import React, { useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { dbService } from '../services/dbService.ts';
 import { User, AdminNotification, Announcement } from '../types.ts';
 import { Bell, Info, Megaphone, Zap, CreditCard, Users, History } from 'lucide-react';
@@ -9,19 +9,32 @@ interface Props {
 }
 
 const UserNotifications: React.FC<Props> = ({ user }) => {
-  // Lấy tin tức hệ thống (Announcements) và thông báo cá nhân (Notifications)
-  const announcements = useMemo(() => dbService.getAnnouncements(), []);
-  const personalNotifications = useMemo(() => {
-    return dbService.getNotifications().filter(n => n.userId === user.id);
-  }, [user.id]);
+  // Use state to hold combined items since dbService methods are asynchronous
+  const [allItems, setAllItems] = useState<any[]>([]);
 
-  const allItems = useMemo(() => {
-    const combined = [
-      ...announcements.map(a => ({ ...a, itemType: 'announcement' as const })),
-      ...personalNotifications.map(n => ({ ...n, itemType: 'personal' as const }))
-    ];
-    return combined.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [announcements, personalNotifications]);
+  // Fetch announcements and notifications on component mount and when user.id changes
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [announcements, personalNotifications] = await Promise.all([
+          dbService.getAnnouncements(),
+          dbService.getNotifications(user.id)
+        ]);
+
+        const combined = [
+          ...announcements.map(a => ({ ...a, itemType: 'announcement' as const })),
+          ...personalNotifications.map(n => ({ ...n, itemType: 'personal' as const }))
+        ];
+
+        combined.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        setAllItems(combined);
+      } catch (error) {
+        console.error("Error fetching notifications:", error);
+      }
+    };
+
+    fetchData();
+  }, [user.id]);
 
   const getIcon = (type: string, itemType: 'announcement' | 'personal') => {
     if (itemType === 'announcement') return <Megaphone className="w-6 h-6 text-blue-500" />;
