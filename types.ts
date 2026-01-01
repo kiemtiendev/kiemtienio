@@ -25,6 +25,7 @@ export interface ActivityLog {
 
 export interface User {
   id: string;
+  adminId?: string;
   email: string;
   fullname: string;
   bankInfo: string;

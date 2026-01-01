@@ -12,6 +12,7 @@ const mapUser = (u: any): User => {
   if (!u) return null as any;
   return {
     ...u,
+    adminId: u.admin_id,
     bankInfo: u.bank_info || '',
     idGame: u.id_game || '',
     totalEarned: Number(u.total_earned ?? 0),
@@ -30,6 +31,7 @@ const mapUser = (u: any): User => {
 export const dbService = {
   signup: async (email: string, pass: string, fullname: string, refId?: string) => {
     try {
+      // 1. Kiểm tra sự tồn tại của email trước khi insert
       const { data: existing, error: checkError } = await supabase
         .from('users_data')
         .select('id, email')
@@ -37,62 +39,74 @@ export const dbService = {
         .maybeSingle();
 
       if (checkError) {
-        console.error("Supabase Error Details:", JSON.stringify(checkError));
+        console.error("Supabase Error Context:", JSON.stringify(checkError));
         const code = checkError.code || 'UNKNOWN';
+        const msg = checkError.message || '';
         
-        if (code === '42703') {
+        if (code === '42703' || (msg.toLowerCase().includes('column') && msg.toLowerCase().includes('not exist'))) {
           return { 
             success: false, 
-            message: `LỖI DB (42703): Bảng users_data của bạn đang bị thiếu cột quan trọng (id hoặc email). Hãy vào Admin -> Cài đặt DB để copy mã SQL tạo lại bảng!` 
+            message: `LỖI DATABASE: Bảng 'users_data' đang thiếu cột hoặc sai kiểu dữ liệu. Hãy vào Admin -> Cài đặt DB để chạy lại mã SQL khởi tạo chuẩn.` 
           };
         }
-        return { success: false, message: `Lỗi Database: ${checkError.message}` };
+        return { success: false, message: `Lỗi kết nối Database: ${msg}` };
       }
       
       if (existing) return { success: false, message: 'Email này đã được sử dụng!' };
 
+      // 2. Tạo ID người dùng
       const userId = Math.random().toString(36).substr(2, 9).toUpperCase();
       const { count } = await supabase.from('users_data').select('id', { count: 'exact', head: true });
       const isFirst = (count || 0) === 0;
 
+      // 3. Chuẩn bị dữ liệu insert - Đảm bảo các trường số là 0, không phải {}
       const newUser = {
         id: userId,
+        admin_id: userId, 
         email,
         password_hash: btoa(pass),
         fullname: fullname.toUpperCase(),
         balance: 0,
+        points: 0,
         total_earned: 0,
         is_admin: isFirst,
         is_banned: false,
         join_date: new Date().toISOString(),
         referred_by: refId || null,
-        bank_info: '',
+        bank_info: '', 
         id_game: '',
-        task_counts: {}
+        task_counts: {} // Cột này phải là JSONB trong Postgres
       };
 
       const { error: insertError } = await supabase.from('users_data').insert([newUser]);
-      if (insertError) return { success: false, message: 'Lỗi đăng ký: ' + insertError.message };
+      if (insertError) {
+        console.error("Insert Error:", insertError);
+        if (insertError.code === '23505') {
+          return { success: false, message: 'Email này đã được sử dụng!' };
+        }
+        const msg = insertError.message;
+        if (msg.includes('invalid input syntax for type integer') && msg.includes('{}')) {
+          return { 
+            success: false, 
+            message: `LỖI KIỂU DỮ LIỆU: Một trong các cột (như task_counts hoặc points) đang bị sai kiểu INTEGER thay vì JSONB/NUMERIC. Hãy chạy lại SQL FIX lỗi trong Admin.` 
+          };
+        }
+        return { success: false, message: 'Lỗi ghi dữ liệu: ' + msg };
+      }
 
+      // 4. Xử lý giới thiệu
       if (refId) {
         const { data: refUser } = await supabase.from('users_data').select('*').eq('id', refId).maybeSingle();
         if (refUser) {
           await supabase.from('users_data').update({
             balance: Number(refUser.balance || 0) + REFERRAL_REWARD,
+            points: Number(refUser.points || 0) + (REFERRAL_REWARD * 10),
             total_earned: Number(refUser.total_earned || 0) + REFERRAL_REWARD,
             referral_count: Number(refUser.referral_count || 0) + 1,
             referral_bonus: Number(refUser.referral_bonus || 0) + REFERRAL_REWARD
           }).eq('id', refId);
         }
       }
-
-      await dbService.addNotification({
-        type: 'auth',
-        title: 'HỘI VIÊN MỚI',
-        content: `${fullname.toUpperCase()} vừa gia nhập Diamond Nova.`,
-        userId: userId,
-        userName: fullname.toUpperCase()
-      });
 
       return { success: true, message: 'Đăng ký thành công!' };
     } catch (err: any) {
@@ -162,6 +176,7 @@ export const dbService = {
     delete dbUpdates.taskCounts;
     delete dbUpdates.bankInfo;
     delete dbUpdates.idGame;
+    delete dbUpdates.adminId;
 
     await supabase.from('users_data').update(dbUpdates).eq('id', id);
   },

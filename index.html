@@ -20,18 +20,23 @@
       window.esmsInitOptions = {
         shimMode: true,
         fetch: async (url, options) => {
-          const res = await fetch(url, options);
+          // Resolve relative URLs to absolute ones to prevent 404s on deep routes
+          const resolvedUrl = new URL(url, window.location.href).href;
+          const res = await fetch(resolvedUrl, options);
           if (!res.ok) return res;
-          if (url.endsWith('.tsx') || url.endsWith('.ts')) {
+          
+          if (resolvedUrl.endsWith('.tsx') || resolvedUrl.endsWith('.ts')) {
             const source = await res.text();
             try {
               const transformed = Babel.transform(source, {
                 presets: ['react', ['typescript', { isTSX: true, allExtensions: true }]],
-                filename: url
+                filename: resolvedUrl
               }).code;
-              return new Response(transformed, { headers: { 'content-type': 'application/javascript' } });
+              return new Response(transformed, { 
+                headers: { 'content-type': 'application/javascript' } 
+              });
             } catch (err) {
-              console.error('Babel compilation error for ' + url, err);
+              console.error('Babel compilation error for ' + resolvedUrl, err);
             }
           }
           return res;
