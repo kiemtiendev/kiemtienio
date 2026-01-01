@@ -10,7 +10,9 @@ import {
   Bot,
   Wifi,
   WifiOff,
-  Bell
+  Bell,
+  Activity,
+  X
 } from 'lucide-react';
 
 // Components
@@ -32,7 +34,7 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>(AppView.DASHBOARD);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [isOnline, setIsOnline] = useState(true);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [hasNewNotif, setHasNewNotif] = useState(false);
 
   const loadSession = async () => {
@@ -43,6 +45,13 @@ const App: React.FC = () => {
 
   useEffect(() => {
     loadSession();
+
+    // Monitor online status
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
 
     // REAL-TIME: Lắng nghe thay đổi Database từ Supabase
     const userSubscription = supabase
@@ -65,12 +74,11 @@ const App: React.FC = () => {
       })
       .subscribe();
 
-    const onlineInterval = setInterval(() => setIsOnline(navigator.onLine), 5000);
-
     return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
       supabase.removeChannel(userSubscription);
       supabase.removeChannel(notifSubscription);
-      clearInterval(onlineInterval);
     };
   }, [user?.id]);
 
@@ -165,7 +173,7 @@ const App: React.FC = () => {
                <div className="flex flex-col">
                  <span className="text-xs font-black text-white uppercase truncate">{user?.fullname}</span>
                  <div className="flex items-center gap-2">
-                    <div className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
+                    <div className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div>
                     <span className="text-[8px] text-slate-500 uppercase">{isOnline ? 'Connected' : 'Offline'}</span>
                  </div>
                </div>
@@ -188,10 +196,44 @@ const App: React.FC = () => {
           {renderView()}
         </div>
 
+        {/* Floating Online Status Badge */}
+        <div className="fixed bottom-6 right-6 z-[60] flex flex-col items-end gap-3 pointer-events-none">
+          <div className={`flex items-center gap-3 px-5 py-3 rounded-2xl border backdrop-blur-3xl shadow-2xl transition-all duration-500 pointer-events-auto ${isOnline ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}`}>
+            <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)] animate-pulse' : 'bg-red-500'}`}></div>
+            <div className="flex flex-col">
+              <span className="text-[9px] font-black uppercase tracking-widest leading-none mb-1">Hệ thống</span>
+              <span className="text-[11px] font-black uppercase italic tracking-tighter leading-none">{isOnline ? 'Trực tuyến' : 'Mất kết nối'}</span>
+            </div>
+            <div className="ml-2 pl-3 border-l border-white/10">
+              {isOnline ? <Wifi className="w-4 h-4 opacity-50" /> : <WifiOff className="w-4 h-4" />}
+            </div>
+          </div>
+        </div>
+
         {/* Global Alert for New Notifs */}
         {hasNewNotif && (
           <div className="fixed top-10 left-1/2 -translate-x-1/2 z-[100] bg-blue-600 text-white px-8 py-4 rounded-full font-black text-xs uppercase tracking-widest italic shadow-2xl flex items-center gap-4 animate-bounce">
             <Bell className="w-5 h-5" /> CÓ THÔNG BÁO MỚI TỪ HỆ THỐNG!
+          </div>
+        )}
+
+        {/* Offline Overlay Overlay */}
+        {!isOnline && (
+          <div className="fixed inset-x-0 bottom-0 z-[70] p-4 animate-in slide-in-from-bottom-full duration-500">
+            <div className="max-w-4xl mx-auto bg-red-600 text-white px-8 py-5 rounded-[2rem] shadow-2xl flex items-center justify-between border border-white/20">
+               <div className="flex items-center gap-5">
+                 <div className="p-3 bg-white/20 rounded-xl">
+                   <WifiOff className="w-6 h-6" />
+                 </div>
+                 <div>
+                   <h4 className="font-black text-sm uppercase italic tracking-tight">KẾT NỐI BỊ GIÁN ĐOẠN</h4>
+                   <p className="text-[10px] font-bold opacity-80 uppercase tracking-widest">Đang chờ tín hiệu internet để đồng bộ dữ liệu với Nova Cloud...</p>
+                 </div>
+               </div>
+               <div className="hidden md:block">
+                 <Activity className="w-6 h-6 animate-pulse opacity-50" />
+               </div>
+            </div>
           </div>
         )}
       </main>

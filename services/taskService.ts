@@ -2,11 +2,9 @@
 import { BLOG_DESTINATION, TASK_RATES } from '../constants.tsx';
 
 /**
- * Silent Redirect 3.5 (Stable Tab Management):
- * - Sử dụng Proxy AllOrigins để lấy link rút gọn mà không lộ mã JSON thô.
- * - Bóc tách chính xác các trường: shortenedUrl, link, url, short_url.
- * - SỬ DỤNG window.open(url, '_blank') để bay sang TAB MỚI.
- * - Giữ nguyên tab web hiện tại cho người dùng.
+ * Silent Redirect 4.0:
+ * - Cải thiện khả năng bóc tách JSON cho LayMaNet (trường html).
+ * - Sử dụng cơ chế mở tab mới an toàn.
  */
 export const openTaskLink = async (taskId: number, userId: string, token: string) => {
   const task = TASK_RATES[taskId];
@@ -15,7 +13,6 @@ export const openTaskLink = async (taskId: number, userId: string, token: string
   const dest = encodeURIComponent(`${BLOG_DESTINATION}?uid=${userId}&tid=${taskId}&key=${token}`);
   let apiUrl = "";
 
-  // Xây dựng API URL theo chuẩn nhà mạng
   switch(taskId) {
     case 1: apiUrl = `https://link4m.co/api-shorten/v2?api=${task.apiKey}&url=${dest}`; break;
     case 2: apiUrl = `https://yeulink.com/api?token=${task.apiKey}&url=${dest}`; break;
@@ -27,34 +24,32 @@ export const openTaskLink = async (taskId: number, userId: string, token: string
 
   if (!apiUrl) return;
 
-  // Sử dụng Proxy để gọi API ngầm
+  // Gọi API thông qua Proxy
   const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`;
 
   try {
     const response = await fetch(proxyUrl);
-    if (!response.ok) throw new Error("Cổng Proxy bận");
+    if (!response.ok) throw new Error("Proxy error");
     
     const proxyData = await response.json();
-    if (!proxyData.contents) throw new Error("Dữ liệu trống");
-    
     const data = JSON.parse(proxyData.contents);
 
-    // Bóc tách link theo các key của nhà mạng (Link4M: shortenedUrl, Others: link/url)
-    const realLink = data.shortenedUrl || 
+    // Bóc tách link từ nhiều nguồn tiềm năng
+    const realLink = data.html || 
+                     data.shortenedUrl || 
                      data.link || 
                      data.url || 
                      data.short_url || 
-                     (data.data && data.data.shortenedUrl);
+                     (data.data && (data.data.shortenedUrl || data.data.short_url || data.data.link || data.data.html));
 
     if (realLink && typeof realLink === 'string' && realLink.startsWith('http')) {
-      // MỞ TRONG TAB MỚI - GIỮ NGUYÊN WEB CHÍNH
       window.open(realLink, '_blank');
     } else {
-      // DỰ PHÒNG: Mở API trực tiếp nếu không bóc tách được (vẫn mở tab mới)
+      // Nếu bóc tách JSON thất bại nhưng API thành công, thử mở trực tiếp apiUrl
       window.open(apiUrl, '_blank');
     }
   } catch (error) {
-    console.warn("Lỗi chuyển hướng ngầm, chuyển sang mở trực tiếp:", error);
+    console.warn("API redirect failed, opening direct URL:", error);
     window.open(apiUrl, '_blank');
   }
 };

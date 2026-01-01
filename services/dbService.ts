@@ -133,13 +133,22 @@ export const dbService = {
     }]);
   },
 
-  getAnnouncements: async () => {
-    const { data, error } = await supabase.from('announcements').select('*').order('created_at', { ascending: false });
-    return error ? handleDbError(error) : (data || []).map(a => ({ ...a, createdAt: a.created_at }));
+  getAnnouncements: async (all = false) => {
+    let q = supabase.from('announcements').select('*').order('created_at', { ascending: false });
+    // Nếu không phải admin lấy hết, thì chỉ lấy is_active = true
+    if (!all) {
+      q = q.eq('is_active', true);
+    }
+    const { data, error } = await q;
+    return error ? handleDbError(error) : (data || []).map(a => ({ ...a, createdAt: a.created_at, isActive: a.is_active }));
   },
 
   saveAnnouncement: async (ann: any) => {
-    await supabase.from('announcements').insert([{ title: ann.title, content: ann.content, priority: ann.priority, created_at: new Date().toISOString() }]);
+    await supabase.from('announcements').insert([{ title: ann.title, content: ann.content, priority: ann.priority, is_active: true, created_at: new Date().toISOString() }]);
+  },
+
+  updateAnnouncementStatus: async (id: string, isActive: boolean) => {
+    await supabase.from('announcements').update({ is_active: isActive }).eq('id', id);
   },
 
   deleteAnnouncement: async (id: string) => {
@@ -165,13 +174,19 @@ export const dbService = {
     await supabase.from('ads').delete().eq('id', id);
   },
 
-  getGiftcodes: async () => {
-    const { data, error } = await supabase.from('giftcodes').select('*');
-    return error ? handleDbError(error) : (data || []).map(g => ({ ...g, maxUses: g.max_uses, usedBy: g.used_by || [] }));
+  getGiftcodes: async (all = false) => {
+    let q = supabase.from('giftcodes').select('*');
+    if (!all) q = q.eq('is_active', true);
+    const { data, error } = await q;
+    return error ? handleDbError(error) : (data || []).map(g => ({ ...g, maxUses: g.max_uses, usedBy: g.used_by || [], isActive: g.is_active }));
   },
 
   addGiftcode: async (gc: any) => {
-    await supabase.from('giftcodes').insert([{ code: gc.code, amount: gc.amount, max_uses: gc.maxUses, used_by: [], created_at: new Date().toISOString() }]);
+    await supabase.from('giftcodes').insert([{ code: gc.code, amount: gc.amount, max_uses: gc.maxUses, used_by: [], is_active: true, created_at: new Date().toISOString() }]);
+  },
+
+  updateGiftcodeStatus: async (code: string, isActive: boolean) => {
+    await supabase.from('giftcodes').update({ is_active: isActive }).eq('code', code);
   },
 
   saveGiftcodes: async (codes: any[]) => {

@@ -37,8 +37,8 @@ const Admin: React.FC<Props> = ({ user }) => {
       const [u, w, g, a, adsData, l] = await Promise.all([
         dbService.getAllUsers(),
         dbService.getWithdrawals(),
-        dbService.getGiftcodes(),
-        dbService.getAnnouncements(),
+        dbService.getGiftcodes(true), // Admin lấy tất cả giftcode kể cả đã ẩn
+        dbService.getAnnouncements(true), // Admin lấy tất cả thông báo
         dbService.getAds(true),
         dbService.getActivityLogs()
       ]);
@@ -55,7 +55,7 @@ const Admin: React.FC<Props> = ({ user }) => {
 
   useEffect(() => {
     refreshData();
-  }, []);
+  }, [tab]);
 
   const handleToggleBan = async (u: User) => {
     await dbService.updateUser(u.id, { isBanned: !u.isBanned });
@@ -91,6 +91,11 @@ const Admin: React.FC<Props> = ({ user }) => {
     refreshData();
   };
 
+  const handleToggleAnn = async (id: string, current: boolean) => {
+    await dbService.updateAnnouncementStatus(id, !current);
+    refreshData();
+  };
+
   const handleDeleteAnn = async (id: string) => {
     if (window.confirm("Xóa thông báo này?")) {
       await dbService.deleteAnnouncement(id);
@@ -104,6 +109,11 @@ const Admin: React.FC<Props> = ({ user }) => {
     refreshData();
   };
 
+  const handleToggleGc = async (code: string, current: boolean) => {
+    await dbService.updateGiftcodeStatus(code, !current);
+    refreshData();
+  };
+
   const handleDeleteGc = async (code: string) => {
     if (window.confirm(`Xóa Giftcode ${code}?`)) {
       await dbService.deleteGiftcode(code);
@@ -112,7 +122,12 @@ const Admin: React.FC<Props> = ({ user }) => {
   };
 
   const copySql = () => {
-    const sql = `-- MÃ KHỞI TẠO DATABASE DIAMOND NOVA
+    const sql = `-- MÃ KHỞI TẠO DATABASE DIAMOND NOVA (CẬP NHẬT)
+-- Thêm cột is_active nếu chưa có
+ALTER TABLE public.announcements ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+ALTER TABLE public.giftcodes ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+
+-- Các bảng cơ bản
 CREATE TABLE IF NOT EXISTS public.users_data (
     id TEXT PRIMARY KEY,
     admin_id TEXT,
@@ -158,6 +173,7 @@ CREATE TABLE IF NOT EXISTS public.announcements (
     title TEXT,
     content TEXT,
     priority TEXT DEFAULT 'low',
+    is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -166,6 +182,7 @@ CREATE TABLE IF NOT EXISTS public.giftcodes (
     amount NUMERIC,
     max_uses INTEGER,
     used_by JSONB DEFAULT '[]'::jsonb,
+    is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -339,12 +356,17 @@ ALTER TABLE public.notifications DISABLE ROW LEVEL SECURITY;`;
               </div>
               <div className="space-y-6">
                  {announcements.map(ann => (
-                   <div key={ann.id} className="glass-card p-8 rounded-[3rem] border border-white/5 relative group">
+                   <div key={ann.id} className={`glass-card p-8 rounded-[3rem] border border-white/5 relative group transition-all ${!ann.isActive ? 'grayscale opacity-50' : ''}`}>
                       <div className="flex justify-between items-start mb-4">
                          <h4 className="font-black text-white italic uppercase text-xl">{ann.title}</h4>
                          <div className="flex items-center gap-4">
                            <span className="text-[10px] text-slate-600 font-bold">{new Date(ann.createdAt).toLocaleDateString('vi-VN')}</span>
-                           <button onClick={() => handleDeleteAnn(ann.id)} className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg opacity-0 group-hover:opacity-100 transition-all"><Trash2 size={16} /></button>
+                           <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                             <button onClick={() => handleToggleAnn(ann.id, ann.isActive || false)} className={`p-2 rounded-lg transition-all ${ann.isActive ? 'text-blue-400 hover:bg-blue-500/10' : 'text-slate-500 hover:bg-slate-500/10'}`}>
+                               {ann.isActive ? <Eye size={16} /> : <EyeOff size={16} />}
+                             </button>
+                             <button onClick={() => handleDeleteAnn(ann.id)} className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-all"><Trash2 size={16} /></button>
+                           </div>
                          </div>
                       </div>
                       <p className="text-slate-400 text-sm font-medium italic">{ann.content}</p>
@@ -374,12 +396,17 @@ ALTER TABLE public.notifications DISABLE ROW LEVEL SECURITY;`;
                    </thead>
                    <tbody>
                      {giftcodes.map(gc => (
-                       <tr key={gc.code} className="border-b border-white/5 hover:bg-white/[0.02]">
+                       <tr key={gc.code} className={`border-b border-white/5 hover:bg-white/[0.02] transition-all ${!gc.isActive ? 'grayscale opacity-40' : ''}`}>
                          <td className="px-6 py-6 font-black text-white tracking-widest uppercase italic">{gc.code}</td>
                          <td className="px-6 py-6 text-center font-black text-rose-500 italic text-lg">{formatK(gc.amount)} P</td>
                          <td className="px-6 py-6 text-center font-black text-slate-400 italic">{(gc.usedBy?.length || 0)} / {gc.maxUses}</td>
                          <td className="px-6 py-6 text-right">
-                           <button onClick={() => handleDeleteGc(gc.code)} className="p-3 text-red-500 hover:bg-red-500/10 rounded-xl transition-all"><Trash2 size={18}/></button>
+                           <div className="flex gap-2 justify-end">
+                             <button onClick={() => handleToggleGc(gc.code, gc.isActive || false)} className={`p-3 rounded-xl transition-all ${gc.isActive ? 'bg-blue-600/10 text-blue-400' : 'bg-slate-800 text-slate-500'}`}>
+                               {gc.isActive ? <Eye size={18} /> : <EyeOff size={18} />}
+                             </button>
+                             <button onClick={() => handleDeleteGc(gc.code)} className="p-3 text-red-500 hover:bg-red-500/10 rounded-xl transition-all"><Trash2 size={18}/></button>
+                           </div>
                          </td>
                        </tr>
                      ))}
@@ -413,13 +440,9 @@ ALTER TABLE public.notifications DISABLE ROW LEVEL SECURITY;`;
                  <div className="relative group">
                     <pre className="w-full bg-black/80 border border-slate-800 rounded-2xl p-8 text-blue-400 font-mono text-[10px] overflow-x-auto max-h-72 italic">
 {`-- COPPY TOÀN BỘ MÃ NÀY --
-CREATE TABLE IF NOT EXISTS public.users_data (id TEXT PRIMARY KEY, email TEXT, ...);
-CREATE TABLE IF NOT EXISTS public.withdrawals (id UUID PRIMARY KEY, ...);
-CREATE TABLE IF NOT EXISTS public.ads (id UUID PRIMARY KEY, title TEXT, ...);
-CREATE TABLE IF NOT EXISTS public.announcements (id UUID PRIMARY KEY, title TEXT, ...);
-CREATE TABLE IF NOT EXISTS public.giftcodes (code TEXT PRIMARY KEY, ...);
-CREATE TABLE IF NOT EXISTS public.activity_logs (id UUID PRIMARY KEY, ...);
-CREATE TABLE IF NOT EXISTS public.notifications (id UUID PRIMARY KEY, ...);`}
+ALTER TABLE public.announcements ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+ALTER TABLE public.giftcodes ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+...`}
                     </pre>
                     <button onClick={copySql} className="absolute top-4 right-4 p-4 bg-slate-900/80 border border-white/5 rounded-xl text-slate-400 hover:text-white transition-all shadow-2xl flex items-center gap-2 font-black uppercase text-[10px]">
                        {sqlCopied ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
