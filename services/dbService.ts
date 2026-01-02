@@ -18,6 +18,7 @@ const mapUser = (u: any): User => {
     bankInfo: u.bank_info || '',
     idGame: u.id_game || '',
     totalEarned: Number(u.total_earned ?? 0),
+    totalGiftcodeEarned: Number(u.total_giftcode_earned ?? 0),
     tasksToday: Number(u.tasks_today ?? 0),
     tasksWeek: Number(u.tasks_week ?? 0),
     isBanned: Boolean(u.is_banned ?? false),
@@ -53,10 +54,13 @@ export const dbService = {
     const pointsFromGiftcodes = Number(u.total_giftcode_earned || 0);
     const pointsFromRefs = Number(u.referral_count || 0) * REFERRAL_REWARD;
 
+    // Tổng số điểm hợp lệ mà người dùng từng có
     const expectedTotal = pointsFromTasks + pointsFromGiftcodes + pointsFromRefs;
+    // Tổng số điểm thực tế (số dư hiện tại + số đã rút)
     const actualTotal = Number(u.balance || 0) + totalWithdrawnPoints;
 
-    if (actualTotal > expectedTotal + 100) {
+    // Tăng biên độ sai số lên 500 P để tránh các lỗi tích lũy nhỏ gây ban nhầm
+    if (actualTotal > expectedTotal + 500) {
       return { 
         isValid: false, 
         reason: `Mất cân đối: Thực tế (${actualTotal}) > Hợp lệ (${expectedTotal}). Chênh lệch: ${actualTotal - expectedTotal} P`,
@@ -145,6 +149,14 @@ export const dbService = {
     if (updates.idGame !== undefined) dbUpdates.id_game = updates.idGame;
     if (updates.balance !== undefined) dbUpdates.balance = updates.balance;
     if (updates.avatarUrl !== undefined) dbUpdates.avatar_url = updates.avatarUrl;
+    
+    // BỔ SUNG: Cập nhật các trường Audit quan trọng
+    if (updates.totalEarned !== undefined) dbUpdates.total_earned = updates.totalEarned;
+    if (updates.totalGiftcodeEarned !== undefined) dbUpdates.total_giftcode_earned = updates.totalGiftcodeEarned;
+    if (updates.referralCount !== undefined) dbUpdates.referral_count = updates.referralCount;
+    if (updates.referralBonus !== undefined) dbUpdates.referral_bonus = updates.referralBonus;
+    if (updates.securityScore !== undefined) dbUpdates.security_score = updates.securityScore;
+
     return await supabase.from('users_data').update(dbUpdates).eq('id', id);
   },
 
@@ -222,13 +234,11 @@ export const dbService = {
       return { error: 'INSUFFICIENT_BALANCE' };
     }
 
-    // NOVA UPDATE: Insert and select the generated ID
     const { data: inserted, error } = await supabase.from('withdrawals').insert([{
       user_id: req.userId, user_name: req.userName, amount: req.amount, type: req.type, status: 'pending', details: req.details
     }]).select().single();
 
     if (!error && inserted) {
-      // NOVA ALERT: Send notification to admin with Withdrawal ID and security score
       await dbService.addNotification({
         type: 'withdrawal',
         title: 'YÊU CẦU RÚT TIỀN MỚI',
@@ -298,7 +308,7 @@ export const dbService = {
   },
 
   saveAd: async (ad: any) => {
-    return await supabase.from('ads').insert([{ title: ad.title, image_url: ad.imageUrl, target_url: ad.targetUrl, is_active: true }]);
+    return await supabase.from('ads').insert([{ title: ad.title, image_url: ad.image_url, target_url: ad.target_url, is_active: true }]);
   },
 
   updateAdStatus: async (id: string, isActive: boolean) => {
@@ -317,7 +327,7 @@ export const dbService = {
   },
 
   addGiftcode: async (gc: any) => {
-    return await supabase.from('giftcodes').insert([{ code: gc.code.toUpperCase(), amount: gc.amount, max_uses: gc.maxUses, used_by: [], is_active: true }]);
+    return await supabase.from('giftcodes').insert([{ code: gc.code.toUpperCase(), amount: gc.amount, max_uses: gc.max_uses, used_by: [], is_active: true }]);
   },
 
   updateGiftcodeStatus: async (code: string, isActive: boolean) => {

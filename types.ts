@@ -32,6 +32,7 @@ export interface User {
   idGame: string;
   balance: number;
   totalEarned: number;
+  totalGiftcodeEarned: number;
   tasksToday: number;
   tasksWeek: number;
   taskCounts: Record<string, number>;
