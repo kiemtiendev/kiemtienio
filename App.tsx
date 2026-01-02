@@ -4,8 +4,8 @@ import { AppView, User } from './types.ts';
 import { dbService, supabase } from './services/dbService.ts';
 import { NAV_ITEMS, formatK, SOCIAL_LINKS } from './constants.tsx';
 import { 
-  Menu, LogOut, Sparkles, Bot, Wifi, WifiOff, Bell, Activity, X, Star, Sun, Moon, 
-  Youtube, MessageCircle, ExternalLink, PhoneCall, SendHorizontal, Crown 
+  Menu, LogOut, Sparkles, Bot, WifiOff, Bell, Activity, X, Star, Sun, Moon, 
+  Crown 
 } from 'lucide-react';
 
 // Components
@@ -170,7 +170,7 @@ const App: React.FC = () => {
                  <span className={`text-xs font-black uppercase truncate ${user.isVip ? 'text-amber-400' : 'text-white'}`}>{user?.fullname}</span>
                  <div className="flex items-center gap-2">
                     <div className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div>
-                    <span className="text-[8px] text-slate-500 uppercase">Trust: {user.securityScore}%</span>
+                    <span className="text-[8px] text-slate-500 uppercase">Hội viên {user.isVip ? 'VIP' : 'Elite'}</span>
                  </div>
                </div>
              </div>

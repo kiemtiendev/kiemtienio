@@ -1,300 +1,418 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { User, WithdrawalRequest, Giftcode, Announcement, AdBanner, ActivityLog, AdminNotification } from '../types.ts';
+import { User, WithdrawalRequest, Giftcode, AdBanner } from '../types.ts';
 import { dbService, supabase } from '../services/dbService.ts';
-import { formatK } from '../constants.tsx';
+import { formatK, RATE_VND_TO_POINT } from '../constants.tsx';
 import { 
-  Users, CreditCard, Search, Ban, Unlock, Trash2, Megaphone, ShieldCheck, 
-  Ticket, History, Activity, Database, Copy, CheckCircle2, 
-  PlusCircle, Gamepad2, Building2, Eye, EyeOff,
-  TrendingUp, SearchIcon, Image as ImageIcon, Wallet, Bell, Trash
+  Users, CreditCard, Ticket, Megaphone, ImageIcon, Eye, EyeOff, Trash2, 
+  PlusCircle, Search, CheckCircle2, XCircle, Settings, UserMinus, 
+  UserPlus, ShieldAlert, Ban, Unlock, Wallet, Activity, TrendingUp, DollarSign,
+  RefreshCcw, UserX
 } from 'lucide-react';
 
-interface Props {
+interface AdminProps {
   user: User;
   onUpdateUser: (user: User) => void;
 }
 
-export default function Admin({ user, onUpdateUser }: Props) {
-  const [tab, setTab] = useState<'users' | 'withdrawals' | 'ads' | 'announcements' | 'giftcodes' | 'logs' | 'notifs'>('users');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [withdrawSearchTerm, setWithdrawSearchTerm] = useState('');
-  const [allUsers, setAllUsers] = useState<User[]>([]);
-  const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
-  const [giftcodes, setGiftcodes] = useState<Giftcode[]>([]);
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+export default function Admin({ user, onUpdateUser }: AdminProps) {
+  const [tab, setTab] = useState<'users' | 'withdrawals' | 'ads' | 'giftcodes'>('users');
+  const [users, setUsers] = useState<User[]>([]);
+  const [withdrawals, setWithdrawals] = useState<any[]>([]);
   const [ads, setAds] = useState<AdBanner[]>([]);
-  const [logs, setLogs] = useState<ActivityLog[]>([]);
-  const [notifs, setNotifs] = useState<AdminNotification[]>([]);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [showAddModal, setShowAddModal] = useState<string | null>(null);
-  const [newAd, setNewAd] = useState({ title: '', imageUrl: '', targetUrl: '' });
-  const [newAnn, setNewAnn] = useState({ title: '', content: '', priority: 'low' as 'low' | 'high' });
+  const [giftcodes, setGiftcodes] = useState<Giftcode[]>([]);
+  
+  const [showAddGc, setShowAddGc] = useState(false);
+  const [showAddAd, setShowAddAd] = useState(false);
   const [newGc, setNewGc] = useState({ code: '', amount: 10000, maxUses: 100 });
-  const [editBalanceUser, setEditBalanceUser] = useState<User | null>(null);
-  const [balanceAdjustAmount, setBalanceAdjustAmount] = useState<number>(0);
+  const [newAd, setNewAd] = useState({ title: '', imageUrl: '', targetUrl: '' });
+  
+  const [activeUserMenu, setActiveUserMenu] = useState<string | null>(null);
+  const [searchUser, setSearchUser] = useState('');
 
-  const stats = useMemo(() => {
-    const totalBalance = allUsers.reduce((sum, u) => sum + (u.balance || 0), 0);
-    const pendingWithdrawals = withdrawals.filter(w => w.status === 'pending').length;
-    return {
-      totalUsers: allUsers.length,
-      totalBalance,
-      pendingWithdrawals
-    };
-  }, [allUsers, withdrawals]);
-
-  const refreshData = async () => {
-    setIsSyncing(true);
-    try {
-      const [u, w, g, a, adsData, l, n] = await Promise.all([
-        dbService.getAllUsers(),
-        dbService.getWithdrawals(),
-        dbService.getGiftcodes(true),
-        dbService.getAnnouncements(true),
-        dbService.getAds(true),
-        dbService.getActivityLogs(),
-        dbService.getNotifications()
-      ]);
-      setAllUsers(u || []);
-      setWithdrawals(w || []);
-      setGiftcodes(g || []);
-      setAnnouncements(a || []);
-      setAds(adsData || []);
-      setLogs(l || []);
-      setNotifs(n || []);
-    } catch (err) { console.error(err); } finally { setIsSyncing(false); }
+  const refresh = async () => {
+    const [u, w, a, g] = await Promise.all([
+      dbService.getAllUsers(),
+      dbService.getWithdrawals(),
+      dbService.getAds(true),
+      dbService.getGiftcodes()
+    ]);
+    setUsers(u);
+    setWithdrawals(w);
+    setAds(a);
+    setGiftcodes(g);
   };
 
   useEffect(() => {
-    refreshData();
-    const adminChannel = supabase.channel('admin-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'giftcodes' }, refreshData)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'withdrawals' }, refreshData)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'users_data' }, refreshData)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, refreshData)
-      .subscribe();
-    return () => { supabase.removeChannel(adminChannel); };
-  }, [tab]);
+    refresh();
+    // REAL-TIME SYNC: Lắng nghe mọi thay đổi trên các bảng quan trọng
+    const channels = [
+      supabase.channel('admin-users').on('postgres_changes', { event: '*', schema: 'public', table: 'users_data' }, refresh).subscribe(),
+      supabase.channel('admin-withdraw').on('postgres_changes', { event: '*', schema: 'public', table: 'withdrawals' }, refresh).subscribe(),
+      supabase.channel('admin-notifs').on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, refresh).subscribe()
+    ];
+    return () => { channels.forEach(c => supabase.removeChannel(c)); };
+  }, []);
 
-  const filteredUsers = useMemo(() => allUsers.filter(u => u.fullname?.toLowerCase().includes(searchTerm.toLowerCase()) || u.email?.toLowerCase().includes(searchTerm.toLowerCase()) || u.id?.toLowerCase().includes(searchTerm.toLowerCase())), [allUsers, searchTerm]);
-  const filteredWithdrawals = useMemo(() => withdrawals.filter(w => w.userName?.toLowerCase().includes(withdrawSearchTerm.toLowerCase()) || w.details?.toLowerCase().includes(withdrawSearchTerm.toLowerCase()) || w.id?.toString().includes(withdrawSearchTerm.toLowerCase())), [withdrawals, withdrawSearchTerm]);
+  const stats = useMemo(() => {
+    const totalPoints = users.reduce((sum, u) => sum + (u.balance || 0), 0);
+    const pendingWithdrawals = withdrawals.filter(w => w.status === 'pending').length;
+    const activeUsers = users.filter(u => {
+      if (!u.lastTaskDate) return false;
+      const last = new Date(u.lastTaskDate).getTime();
+      return (Date.now() - last) < (24 * 60 * 60 * 1000);
+    }).length;
 
-  const handleWithdrawAction = async (id: string, status: 'completed' | 'rejected') => {
-    if (!window.confirm(status === 'completed' ? 'Xác nhận duyệt chi?' : 'Từ chối yêu cầu?')) return;
+    return {
+      totalUsers: users.length,
+      totalPoints,
+      realMoney: Math.floor(totalPoints / RATE_VND_TO_POINT),
+      pendingWithdrawals,
+      activeUsers
+    };
+  }, [users, withdrawals]);
+
+  const filteredUsers = useMemo(() => {
+    return users.filter(u => 
+      u.fullname.toLowerCase().includes(searchUser.toLowerCase()) || 
+      u.email.toLowerCase().includes(searchUser.toLowerCase())
+    );
+  }, [users, searchUser]);
+
+  // Actions cho User Menu Setting
+  const handleToggleBan = async (u: User) => {
+    const reason = u.isBanned ? '' : prompt('Lý do ban?') || 'Vi phạm chính sách';
+    await dbService.updateUser(u.id, { is_banned: !u.isBanned, ban_reason: reason });
+    setActiveUserMenu(null);
+  };
+
+  const handleAdjustPoints = async (userId: string, isAdd: boolean) => {
+    const amount = parseInt(prompt(`Nhập số điểm muốn ${isAdd ? 'CỘNG' : 'TRỪ'}?`) || '0');
+    if (isNaN(amount) || amount <= 0) return;
+    await dbService.adjustBalance(userId, isAdd ? amount : -amount);
+    setActiveUserMenu(null);
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!confirm('BẠN CÓ CHẮC MUỐN XÓA VĨNH VIỄN TÀI KHOẢN NÀY?')) return;
+    await dbService.deleteUser(userId);
+    setActiveUserMenu(null);
+  };
+
+  const handleWithdrawAction = async (id: string, status: string) => {
     await dbService.updateWithdrawalStatus(id, status);
-    refreshData();
-  };
-
-  const handleCreateGc = async () => {
-    if (!newGc.code || !newGc.amount) return alert("Vui lòng điền đủ thông tin");
-    await dbService.addGiftcode(newGc);
-    setNewGc({ code: '', amount: 10000, maxUses: 100 });
-    setShowAddModal(null);
-    refreshData();
-  };
-
-  const handleCreateAd = async () => {
-    if (!newAd.title || !newAd.imageUrl) return alert("Vui lòng điền đủ thông tin");
-    await dbService.saveAd(newAd);
-    setNewAd({ title: '', imageUrl: '', targetUrl: '' });
-    setShowAddModal(null);
-    refreshData();
-  };
-
-  const handleCreateAnn = async () => {
-    if (!newAnn.title || !newAnn.content) return alert("Vui lòng điền đủ thông tin");
-    await dbService.saveAnnouncement(newAnn);
-    setNewAnn({ title: '', content: '', priority: 'low' });
-    setShowAddModal(null);
-    refreshData();
   };
 
   return (
     <div className="space-y-8 animate-in fade-in pb-24">
-      {/* Admin Stats Header */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="glass-card p-6 rounded-[2rem] border border-blue-500/20 bg-blue-600/5">
-           <div className="flex items-center gap-4 mb-2">
-             <Users className="text-blue-500" />
-             <span className="text-[10px] font-black uppercase text-slate-500 italic">Tổng hội viên</span>
-           </div>
-           <div className="text-3xl font-black text-white italic tracking-tighter">{stats.totalUsers.toLocaleString()}</div>
+      {/* 5 Bảng thống kê trên cùng trang hệ thống */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="glass-card p-6 rounded-[2rem] border-l-4 border-l-blue-600 bg-blue-600/5 shadow-xl">
+           <Users className="w-6 h-6 text-blue-500 mb-2" />
+           <p className="text-[9px] font-black text-slate-500 uppercase italic">Tổng Người Dùng</p>
+           <h3 className="text-xl font-black text-white italic">{stats.totalUsers}</h3>
         </div>
-        <div className="glass-card p-6 rounded-[2rem] border border-emerald-500/20 bg-emerald-600/5">
-           <div className="flex items-center gap-4 mb-2">
-             <Wallet className="text-emerald-500" />
-             <span className="text-[10px] font-black uppercase text-slate-500 italic">Tổng số dư hệ thống</span>
-           </div>
-           <div className="text-3xl font-black text-emerald-500 italic tracking-tighter">{formatK(stats.totalBalance)} P</div>
+        <div className="glass-card p-6 rounded-[2rem] border-l-4 border-l-amber-600 bg-amber-600/5 shadow-xl">
+           <Wallet className="w-6 h-6 text-amber-500 mb-2" />
+           <p className="text-[9px] font-black text-slate-500 uppercase italic">Tổng Số Điểm</p>
+           <h3 className="text-xl font-black text-white italic">{formatK(stats.totalPoints)}</h3>
         </div>
-        <div className="glass-card p-6 rounded-[2rem] border border-amber-500/20 bg-amber-600/5">
-           <div className="flex items-center gap-4 mb-2">
-             <Activity className="text-amber-500" />
-             <span className="text-[10px] font-black uppercase text-slate-500 italic">Lệnh rút chờ duyệt</span>
-           </div>
-           <div className="text-3xl font-black text-amber-500 italic tracking-tighter">{stats.pendingWithdrawals}</div>
+        <div className="glass-card p-6 rounded-[2rem] border-l-4 border-l-emerald-600 bg-emerald-600/5 shadow-xl">
+           <DollarSign className="w-6 h-6 text-emerald-500 mb-2" />
+           <p className="text-[9px] font-black text-slate-500 uppercase italic">Số Tiền Thực</p>
+           <h3 className="text-xl font-black text-white italic">{stats.realMoney.toLocaleString()}đ</h3>
+        </div>
+        <div className="glass-card p-6 rounded-[2rem] border-l-4 border-l-rose-600 bg-rose-600/5 shadow-xl">
+           <Activity className="w-6 h-6 text-rose-500 mb-2" />
+           <p className="text-[9px] font-black text-slate-500 uppercase italic">Số Lệnh Chờ</p>
+           <h3 className="text-xl font-black text-white italic">{stats.pendingWithdrawals}</h3>
+        </div>
+        <div className="glass-card p-6 rounded-[2rem] border-l-4 border-l-indigo-600 bg-indigo-600/5 shadow-xl">
+           <TrendingUp className="w-6 h-6 text-indigo-500 mb-2" />
+           <p className="text-[9px] font-black text-slate-500 uppercase italic">Đang hoạt động</p>
+           <h3 className="text-xl font-black text-white italic">{stats.activeUsers}</h3>
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 overflow-x-auto no-scrollbar">
+      {/* Menu Tabs Navigation */}
+      <div className="flex flex-wrap gap-2">
         {[
-          { id: 'users', label: 'Hội viên', icon: <Users size={16} /> },
-          { id: 'withdrawals', label: 'Rút tiền', icon: <CreditCard size={16} /> },
-          { id: 'giftcodes', label: 'Giftcode', icon: <Ticket size={16} /> },
-          { id: 'ads', label: 'Quảng cáo', icon: <ImageIcon size={16} /> },
-          { id: 'announcements', label: 'Thông báo', icon: <Megaphone size={16} /> },
-          { id: 'logs', label: 'Hoạt động', icon: <History size={16} /> },
-          { id: 'notifs', label: 'Hộp thư', icon: <Bell size={16} /> }
+          { id: 'users', label: 'Hội viên', icon: <Users size={14} /> },
+          { id: 'withdrawals', label: 'Rút tiền', icon: <CreditCard size={14} /> },
+          { id: 'ads', label: 'Quảng cáo', icon: <ImageIcon size={14} /> },
+          { id: 'giftcodes', label: 'Giftcodes', icon: <Ticket size={14} /> }
         ].map(i => (
-          <button key={i.id} onClick={() => setTab(i.id as any)} className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest transition-all ${tab === i.id ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-900/60 text-slate-400 hover:bg-slate-800'}`}>
-            {i.icon} <span>{i.label}</span>
+          <button key={i.id} onClick={() => setTab(i.id as any)} className={`flex items-center gap-2 px-6 py-3 rounded-xl font-black text-[10px] uppercase italic transition-all ${tab === i.id ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-900 text-slate-500 hover:bg-slate-800'}`}>
+            {i.icon} {i.label}
           </button>
         ))}
+        <button onClick={refresh} className="ml-auto p-3 bg-slate-900 text-slate-500 rounded-xl hover:text-white"><RefreshCcw size={14} /></button>
       </div>
 
-      <div className="glass-card p-6 rounded-[2rem] border border-white/5 bg-slate-950/40 min-h-[500px]">
+      <div className="glass-card p-8 rounded-[3rem] border border-white/5 bg-slate-950/40 min-h-[500px]">
         {tab === 'users' && (
-           <div className="space-y-6">
-              <div className="relative w-full max-w-md"><SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 w-4 h-4" /><input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Tìm hội viên..." className="w-full bg-slate-900 border border-white/5 rounded-xl pl-12 pr-4 py-3 text-white text-sm outline-none focus:border-blue-500" /></div>
-              <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="text-slate-500 uppercase font-black border-b border-white/5"><tr><th className="px-4 py-3">Hội viên</th><th className="px-4 py-3">Số dư</th><th className="px-4 py-3">Rank</th><th className="px-4 py-3 text-right">Thao tác</th></tr></thead><tbody className="divide-y divide-white/5">{filteredUsers.map(u => (<tr key={u.id} className="hover:bg-white/[0.02]"><td className="px-4 py-4"><div className="font-bold text-white">{u.fullname}</div><div className="text-[10px] text-slate-500">#{u.id} • {u.email}</div></td><td className="px-4 py-4 font-black text-emerald-500">{Number(u.balance).toLocaleString()} P</td><td className="px-4 py-4"><span className={`${u.isVip ? 'text-amber-400 font-black' : 'text-slate-500'}`}>{u.isVip ? 'VIP' : 'Thường'}</span></td><td className="px-4 py-4 text-right flex justify-end gap-2"><button onClick={() => dbService.updateUser(u.id, { isBanned: !u.isBanned }).then(refreshData)} className={`p-2 rounded-lg ${u.isBanned ? 'bg-emerald-600/10 text-emerald-400' : 'bg-red-600/10 text-red-500'}`}>{u.isBanned ? <Unlock size={16} /> : <Ban size={16} />}</button></td></tr>))}</tbody></table></div>
-           </div>
+          <div className="space-y-6">
+            <div className="flex justify-between items-center gap-4">
+               <h3 className="text-xl font-black text-white italic uppercase tracking-tighter">QUẢN LÝ HỘI VIÊN</h3>
+               <div className="relative flex-1 max-w-xs">
+                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
+                 <input type="text" placeholder="Tìm tên, email..." value={searchUser} onChange={e => setSearchUser(e.target.value)} className="w-full bg-slate-900 border border-white/5 rounded-xl pl-12 pr-4 py-3 text-xs text-white outline-none focus:border-blue-500" />
+               </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="text-[10px] font-black text-slate-500 uppercase italic border-b border-white/5">
+                  <tr>
+                    <th className="px-4 py-4">Số thứ tự</th>
+                    <th className="px-4 py-4">Tên / Gmail</th>
+                    <th className="px-4 py-4">Rank</th>
+                    <th className="px-4 py-4">Số tiền</th>
+                    <th className="px-4 py-4 text-right">Setting</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {filteredUsers.map((u, i) => (
+                    <tr key={u.id} className="text-xs group hover:bg-white/[0.02]">
+                      <td className="px-4 py-6 text-slate-600 font-black">#{i + 1}</td>
+                      <td className="px-4 py-6">
+                         <div className="font-bold text-white uppercase">{u.fullname}</div>
+                         <div className="text-[9px] text-slate-500 mt-1">{u.email}</div>
+                      </td>
+                      <td className="px-4 py-6">
+                        <span className={`px-3 py-1 rounded-lg font-black text-[9px] uppercase italic ${u.isVip ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' : 'bg-slate-800 text-slate-500'}`}>
+                          {u.vipTier.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="px-4 py-6 font-black text-emerald-500">{u.balance.toLocaleString()} P</td>
+                      <td className="px-4 py-6 text-right relative">
+                        <button 
+                          onClick={() => setActiveUserMenu(activeUserMenu === u.id ? null : u.id)}
+                          className="p-2 bg-slate-900 rounded-lg text-slate-400 hover:text-blue-500 border border-white/5 transition-all"
+                        >
+                          <Settings size={16} />
+                        </button>
+                        {activeUserMenu === u.id && (
+                          <div className="absolute right-4 top-16 z-[100] w-48 glass-card border border-white/10 rounded-2xl p-2 shadow-3xl animate-in fade-in slide-in-from-top-2">
+                             <button onClick={() => handleToggleBan(u)} className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 text-left text-rose-500 font-bold">
+                                {u.isBanned ? <Unlock size={14} /> : <Ban size={14} />} <span>{u.isBanned ? 'Mở Khóa (Unban)' : 'Khóa (Ban)'}</span>
+                             </button>
+                             <button onClick={() => alert(`Điểm uy tín: ${u.securityScore || 100}%`)} className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 text-left text-blue-400 font-bold">
+                                <ShieldAlert size={14} /> <span>Check uy tín</span>
+                             </button>
+                             <button onClick={() => handleAdjustPoints(u.id, true)} className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 text-left text-emerald-400 font-bold">
+                                <UserPlus size={14} /> <span>Cộng điểm</span>
+                             </button>
+                             <button onClick={() => handleAdjustPoints(u.id, false)} className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 text-left text-amber-500 font-bold">
+                                <UserMinus size={14} /> <span>Trừ điểm</span>
+                             </button>
+                             <div className="h-px bg-white/5 my-2"></div>
+                             <button onClick={() => handleDeleteUser(u.id)} className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-red-600 hover:text-white text-left text-slate-500 font-bold transition-all">
+                                <UserX size={14} /> <span>Xóa tài khoản</span>
+                             </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {tab === 'withdrawals' && (
+          <div className="space-y-6">
+            <h3 className="text-xl font-black text-white italic uppercase tracking-tighter">THÔNG BÁO RÚT TIỀN</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="text-[10px] font-black text-slate-500 uppercase italic border-b border-white/5">
+                  <tr>
+                    <th className="px-4 py-4"># Mã giao dịch</th>
+                    <th className="px-4 py-4">Khách hàng</th>
+                    <th className="px-4 py-4">Thông tin thanh toán</th>
+                    <th className="px-4 py-4">Loại rút</th>
+                    <th className="px-4 py-4">Số tiền</th>
+                    <th className="px-4 py-4">Trạng thái</th>
+                    <th className="px-4 py-4 text-right">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {withdrawals.map(w => (
+                    <tr key={w.id} className="text-xs group hover:bg-white/[0.02]">
+                      <td className="px-4 py-6 font-black text-blue-500">#{w.id} - DIAMOND NOVA</td>
+                      <td className="px-4 py-6">
+                         <div className="font-bold text-white uppercase">{w.user_name}</div>
+                         <div className="text-[9px] text-slate-500 italic truncate max-w-[120px]">{w.user_id}</div>
+                      </td>
+                      <td className="px-4 py-6 text-slate-400 italic text-[10px] max-w-[150px] truncate">{w.details}</td>
+                      <td className="px-4 py-6">
+                        <span className={`font-black uppercase italic ${w.type === 'bank' ? 'text-emerald-500' : 'text-purple-500'}`}>
+                          {w.type === 'bank' ? 'ATM / BANK' : 'GAME KC'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-6 font-black text-white">{w.amount.toLocaleString()}đ</td>
+                      <td className="px-4 py-6">
+                         <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase italic ${w.status === 'pending' ? 'bg-amber-500/10 text-amber-500' : w.status === 'completed' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-500'}`}>
+                           {w.status === 'pending' ? 'ĐANG CHỜ' : w.status === 'completed' ? 'DUYỆT' : 'CHỐI'}
+                         </span>
+                      </td>
+                      <td className="px-4 py-6 text-right">
+                         {w.status === 'pending' && (
+                           <div className="flex justify-end gap-2">
+                              <button onClick={() => handleWithdrawAction(w.id, 'completed')} className="p-2 bg-emerald-600/10 text-emerald-400 rounded-xl hover:bg-emerald-600 hover:text-white transition-all"><CheckCircle2 size={16} /></button>
+                              <button onClick={() => handleWithdrawAction(w.id, 'rejected')} className="p-2 bg-red-600/10 text-red-500 rounded-xl hover:bg-red-600 hover:text-white transition-all"><XCircle size={16} /></button>
+                           </div>
+                         )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         )}
 
         {tab === 'ads' && (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
-              <h3 className="text-lg font-black text-white uppercase italic">Quản lý quảng cáo</h3>
-              <button onClick={() => setShowAddModal('ad')} className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold flex items-center gap-2"><PlusCircle size={16} /> THÊM QC</button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {ads.map(ad => (
-                <div key={ad.id} className="p-5 rounded-2xl border border-white/5 bg-slate-900/40 flex items-center justify-between gap-4">
-                  <img src={ad.imageUrl} className="w-16 h-16 object-cover rounded-xl" />
-                  <div className="flex-1">
-                    <h4 className="text-sm font-black text-white">{ad.title}</h4>
-                    <p className="text-[10px] text-slate-500 truncate max-w-[200px]">{ad.targetUrl}</p>
-                  </div>
-                  <button onClick={() => dbService.deleteAd(ad.id).then(refreshData)} className="p-2 text-red-500"><Trash2 size={18} /></button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {tab === 'announcements' && (
-          <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-black text-white uppercase italic">Thông báo hệ thống</h3>
-              <button onClick={() => setShowAddModal('ann')} className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold flex items-center gap-2"><PlusCircle size={16} /> THÊM TB</button>
-            </div>
-            <div className="space-y-3">
-              {announcements.map(ann => (
-                <div key={ann.id} className="p-5 rounded-2xl border border-white/5 bg-slate-900/40 flex items-center justify-between">
-                  <div>
-                    <h4 className="text-sm font-black text-white">{ann.title}</h4>
-                    <p className="text-xs text-slate-500 italic">{ann.content}</p>
-                  </div>
-                  <button onClick={() => dbService.deleteAnnouncement(ann.id).then(refreshData)} className="p-2 text-red-500"><Trash2 size={18} /></button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {tab === 'logs' && (
-          <div className="space-y-4">
-            <h3 className="text-lg font-black text-white uppercase italic">Nhật ký hoạt động</h3>
-            <div className="space-y-2">
-              {logs.map(log => (
-                <div key={log.id} className="text-xs p-3 rounded-lg bg-black/20 border border-white/5 flex justify-between">
-                  <div>
-                    <span className="text-blue-400 font-bold">[{log.userName}]</span> {log.action}: {log.details}
-                  </div>
-                  <span className="text-slate-600 italic">{new Date(log.createdAt).toLocaleString('vi-VN')}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {tab === 'notifs' && (
-          <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-black text-white uppercase italic">Xóa bớt hộp thư Admin</h3>
-              <button 
-                onClick={async () => {
-                  if(!confirm('Xóa tất cả thông báo?')) return;
-                  for(const n of notifs) await dbService.deleteNotification(n.id);
-                  refreshData();
-                }} 
-                className="px-4 py-2 bg-red-600/10 text-red-500 border border-red-500/20 rounded-xl text-[10px] font-black uppercase italic"
-              >
-                XÓA TẤT CẢ
+              <h3 className="text-xl font-black text-white italic uppercase tracking-tighter">QUẢN LÝ QUẢNG CÁO</h3>
+              <button onClick={() => setShowAddAd(true)} className="px-10 py-5 bg-blue-600 text-white rounded-2xl text-[11px] font-black uppercase italic tracking-widest shadow-xl flex items-center gap-3 active:scale-95 transition-all">
+                 <PlusCircle size={16} /> TẠO QUẢNG CÁO MỚI
               </button>
             </div>
-            <div className="space-y-2">
-              {notifs.map(n => (
-                <div key={n.id} className="flex items-center justify-between p-4 rounded-xl bg-slate-900/50 border border-white/5">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-[9px] font-black text-blue-500 uppercase">{n.type}</span>
-                      <span className="text-[9px] text-slate-600">{new Date(n.createdAt).toLocaleString()}</span>
-                    </div>
-                    <h5 className="text-xs font-black text-white italic">{n.title}</h5>
-                    <p className="text-[10px] text-slate-400">{n.content}</p>
-                  </div>
-                  <button onClick={() => dbService.deleteNotification(n.id).then(refreshData)} className="p-2 text-red-500/50 hover:text-red-500 transition-colors">
-                    <Trash size={16} />
-                  </button>
-                </div>
-              ))}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="text-[10px] font-black text-slate-500 uppercase italic border-b border-white/5">
+                  <tr>
+                    <th className="px-4 py-4">Hình ảnh</th>
+                    <th className="px-4 py-4">Tên sản phẩm</th>
+                    <th className="px-4 py-4">URL Link</th>
+                    <th className="px-4 py-4">Trạng thái</th>
+                    <th className="px-4 py-4 text-right">Hành động</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {ads.map(ad => (
+                    <tr key={ad.id} className="text-xs group hover:bg-white/[0.02]">
+                      <td className="px-4 py-4">
+                        <img src={ad.imageUrl} className="w-16 h-10 object-cover rounded-lg border border-white/5" />
+                      </td>
+                      <td className="px-4 py-4 font-black text-white">{ad.title}</td>
+                      <td className="px-4 py-4 text-blue-400 text-[10px] italic truncate max-w-[150px]">{ad.targetUrl}</td>
+                      <td className="px-4 py-4">
+                        <span className={`px-2 py-1 rounded text-[9px] font-black italic ${ad.isActive ? 'bg-emerald-500/10 text-emerald-500' : 'bg-slate-800 text-slate-600'}`}>
+                          {ad.isActive ? 'HIỆN' : 'ẨN'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 text-right">
+                        <div className="flex justify-end gap-2">
+                           <button onClick={() => dbService.updateAdStatus(ad.id, !ad.isActive).then(refresh)} className="p-2 bg-slate-800 text-slate-400 rounded-lg hover:text-white">
+                              {ad.isActive ? <EyeOff size={16} /> : <Eye size={16} />}
+                           </button>
+                           <button onClick={() => dbService.deleteAd(ad.id).then(refresh)} className="p-2 bg-red-600/10 text-red-500 rounded-lg hover:bg-red-600 hover:text-white">
+                              <Trash2 size={16} />
+                           </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
 
-        {/* ... existing giftcodes and withdrawals ... */}
+        {tab === 'giftcodes' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h3 className="text-xl font-black text-white italic uppercase tracking-tighter">QUẢN LÝ GIFTCODE</h3>
+              <button onClick={() => setShowAddGc(true)} className="px-10 py-5 bg-emerald-600 text-white rounded-2xl text-[11px] font-black uppercase italic tracking-widest shadow-xl flex items-center gap-3 active:scale-95 transition-all">
+                 <PlusCircle size={16} /> TẠO GIFTCODE MỚI
+              </button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="text-[10px] font-black text-slate-500 uppercase italic border-b border-white/5">
+                  <tr>
+                    <th className="px-4 py-4">Tên mã (Code)</th>
+                    <th className="px-4 py-4">Số điểm thưởng</th>
+                    <th className="px-4 py-4">Lượt đã sử dụng</th>
+                    <th className="px-4 py-4">Tối đa lượt dùng</th>
+                    <th className="px-4 py-4 text-right">Trạng thái</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {giftcodes.map(g => (
+                    <tr key={g.code} className="text-xs group hover:bg-white/[0.02]">
+                      <td className="px-4 py-6 font-black text-rose-500 tracking-widest">{g.code}</td>
+                      <td className="px-4 py-6 font-black text-emerald-500">{g.amount.toLocaleString()} P</td>
+                      <td className="px-4 py-6 text-slate-400 font-black">{(g.usedBy || []).length} lượt</td>
+                      <td className="px-4 py-6 text-slate-500 font-black">{g.maxUses} lượt</td>
+                      <td className="px-4 py-6 text-right">
+                         <span className={`px-2 py-1 rounded text-[9px] font-black italic ${g.isActive ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
+                           {g.isActive ? 'ĐANG CHẠY' : 'HẾT LƯỢT'}
+                         </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
 
-      {showAddModal === 'ad' && (
+      {/* Modal Tạo Giftcode - HÌNH CHỮ NHẬT */}
+      {showAddGc && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
-          <div className="glass-card w-full max-w-md p-8 rounded-3xl border border-white/10 space-y-4">
-            <h2 className="text-xl font-black text-white uppercase italic">Thêm quảng cáo</h2>
-            <input type="text" placeholder="Tiêu đề" value={newAd.title} onChange={e => setNewAd({...newAd, title: e.target.value})} className="w-full bg-slate-900 border border-white/10 p-4 rounded-xl text-white text-sm" />
-            <input type="text" placeholder="Link ảnh (imageUrl)" value={newAd.imageUrl} onChange={e => setNewAd({...newAd, imageUrl: e.target.value})} className="w-full bg-slate-900 border border-white/10 p-4 rounded-xl text-white text-sm" />
-            <input type="text" placeholder="Link đích (targetUrl)" value={newAd.targetUrl} onChange={e => setNewAd({...newAd, targetUrl: e.target.value})} className="w-full bg-slate-900 border border-white/10 p-4 rounded-xl text-white text-sm" />
-            <div className="flex gap-4">
-              <button onClick={() => setShowAddModal(null)} className="flex-1 py-4 bg-slate-800 text-white font-black rounded-xl uppercase text-xs">Hủy</button>
-              <button onClick={handleCreateAd} className="flex-1 py-4 bg-blue-600 text-white font-black rounded-xl uppercase text-xs">Lưu</button>
-            </div>
-          </div>
+           <div className="glass-card w-full max-w-md p-10 rounded-[2.5rem] border border-white/10 space-y-6 animate-in zoom-in-95">
+              <h2 className="text-2xl font-black text-white italic uppercase tracking-tighter">TẠO GIFTCODE</h2>
+              <div className="space-y-4">
+                 <div className="space-y-2">
+                    <label className="text-[9px] font-black text-slate-500 uppercase italic">Tên mã (Code)</label>
+                    <input type="text" placeholder="NOVA2025" value={newGc.code} onChange={e => setNewGc({...newGc, code: e.target.value.toUpperCase()})} className="w-full bg-slate-900 border border-white/5 rounded-2xl px-6 py-4 text-white font-black uppercase outline-none focus:border-emerald-500" />
+                 </div>
+                 <div className="space-y-2">
+                    <label className="text-[9px] font-black text-slate-500 uppercase italic">Số điểm thưởng</label>
+                    <input type="number" placeholder="50000" value={newGc.amount} onChange={e => setNewGc({...newGc, amount: Number(e.target.value)})} className="w-full bg-slate-900 border border-white/5 rounded-2xl px-6 py-4 text-white font-black outline-none focus:border-emerald-500" />
+                 </div>
+                 <div className="space-y-2">
+                    <label className="text-[9px] font-black text-slate-500 uppercase italic">Số lượt dùng tối đa</label>
+                    <input type="number" placeholder="100" value={newGc.maxUses} onChange={e => setNewGc({...newGc, maxUses: Number(e.target.value)})} className="w-full bg-slate-900 border border-white/5 rounded-2xl px-6 py-4 text-white font-black outline-none focus:border-emerald-500" />
+                 </div>
+              </div>
+              <div className="flex gap-4 pt-4">
+                 <button onClick={() => setShowAddGc(false)} className="flex-1 py-4 bg-slate-800 text-slate-500 font-black rounded-xl text-[10px] uppercase italic tracking-widest">HỦY BỎ</button>
+                 <button onClick={() => { dbService.addGiftcode(newGc).then(refresh); setShowAddGc(false); }} className="flex-1 py-4 bg-emerald-600 text-white font-black rounded-xl text-[10px] uppercase italic tracking-widest shadow-lg shadow-emerald-600/20">XÁC NHẬN TẠO</button>
+              </div>
+           </div>
         </div>
       )}
 
-      {showAddModal === 'ann' && (
+      {/* Modal Tạo Quảng Cáo - HÌNH CHỮ NHẬT */}
+      {showAddAd && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
-          <div className="glass-card w-full max-w-md p-8 rounded-3xl border border-white/10 space-y-4">
-            <h2 className="text-xl font-black text-white uppercase italic">Tạo thông báo</h2>
-            <input type="text" placeholder="Tiêu đề" value={newAnn.title} onChange={e => setNewAnn({...newAnn, title: e.target.value})} className="w-full bg-slate-900 border border-white/10 p-4 rounded-xl text-white text-sm" />
-            <textarea placeholder="Nội dung" value={newAnn.content} onChange={e => setNewAnn({...newAnn, content: e.target.value})} className="w-full bg-slate-900 border border-white/10 p-4 rounded-xl text-white text-sm h-32" />
-            <div className="flex gap-4">
-              <button onClick={() => setShowAddModal(null)} className="flex-1 py-4 bg-slate-800 text-white font-black rounded-xl uppercase text-xs">Hủy</button>
-              <button onClick={handleCreateAnn} className="flex-1 py-4 bg-blue-600 text-white font-black rounded-xl uppercase text-xs">Lưu</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showAddModal === 'gc' && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
-          <div className="glass-card w-full max-w-md p-8 rounded-3xl border border-white/10 space-y-4">
-            <h2 className="text-xl font-black text-white uppercase italic">Tạo Giftcode</h2>
-            <input type="text" placeholder="Mã Code" value={newGc.code} onChange={e => setNewGc({...newGc, code: e.target.value.toUpperCase()})} className="w-full bg-slate-900 border border-white/10 p-4 rounded-xl text-white outline-none" />
-            <input type="number" placeholder="Số tiền tặng (P)" value={newGc.amount} onChange={e => setNewGc({...newGc, amount: Number(e.target.value)})} className="w-full bg-slate-900 border border-white/10 p-4 rounded-xl text-white outline-none" />
-            <input type="number" placeholder="Giới hạn lượt dùng" value={newGc.maxUses} onChange={e => setNewGc({...newGc, maxUses: Number(e.target.value)})} className="w-full bg-slate-900 border border-white/10 p-4 rounded-xl text-white outline-none" />
-            <button onClick={handleCreateGc} className="w-full py-4 bg-blue-600 text-white font-black rounded-xl uppercase">Tạo ngay</button>
-            <button onClick={() => setShowAddModal(null)} className="w-full text-slate-500 font-bold uppercase text-[10px]">Hủy bỏ</button>
-          </div>
+           <div className="glass-card w-full max-w-md p-10 rounded-[2.5rem] border border-white/10 space-y-6 animate-in zoom-in-95">
+              <h2 className="text-2xl font-black text-white italic uppercase tracking-tighter">TẠO QUẢNG CÁO</h2>
+              <div className="space-y-4">
+                 <div className="space-y-2">
+                    <label className="text-[9px] font-black text-slate-500 uppercase italic">Tên sản phẩm</label>
+                    <input type="text" placeholder="Tiêu đề quảng cáo" value={newAd.title} onChange={e => setNewAd({...newAd, title: e.target.value})} className="w-full bg-slate-900 border border-white/5 rounded-2xl px-6 py-4 text-white font-bold outline-none focus:border-blue-500" />
+                 </div>
+                 <div className="space-y-2">
+                    <label className="text-[9px] font-black text-slate-500 uppercase italic">Link URL hình ảnh</label>
+                    <input type="text" placeholder="https://image-url.com/ad.jpg" value={newAd.imageUrl} onChange={e => setNewAd({...newAd, imageUrl: e.target.value})} className="w-full bg-slate-900 border border-white/5 rounded-2xl px-6 py-4 text-white font-bold outline-none focus:border-blue-500" />
+                 </div>
+                 <div className="space-y-2">
+                    <label className="text-[9px] font-black text-slate-500 uppercase italic">Link sản phẩm (Link đích)</label>
+                    <input type="text" placeholder="https://shopee.vn/product" value={newAd.targetUrl} onChange={e => setNewAd({...newAd, targetUrl: e.target.value})} className="w-full bg-slate-900 border border-white/5 rounded-2xl px-6 py-4 text-white font-bold outline-none focus:border-blue-500" />
+                 </div>
+              </div>
+              <div className="flex gap-4 pt-4">
+                 <button onClick={() => setShowAddAd(false)} className="flex-1 py-4 bg-slate-800 text-slate-500 font-black rounded-xl text-[10px] uppercase italic tracking-widest">HỦY BỎ</button>
+                 <button onClick={() => { dbService.saveAd(newAd).then(refresh); setShowAddAd(false); }} className="flex-1 py-4 bg-blue-600 text-white font-black rounded-xl text-[10px] uppercase italic tracking-widest shadow-lg shadow-blue-600/20">LƯU QUẢNG CÁO</button>
+              </div>
+           </div>
         </div>
       )}
     </div>
