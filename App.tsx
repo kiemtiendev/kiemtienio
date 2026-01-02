@@ -24,6 +24,7 @@ import Support from './components/Support.tsx';
 import GlobalSearch from './components/GlobalSearch.tsx';
 import Vip from './components/Vip.tsx';
 import NovaNotification, { NovaSecurityModal } from './components/NovaNotification.tsx';
+import GoldModal from './components/GoldModal.tsx';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -37,10 +38,15 @@ const App: React.FC = () => {
   
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [securityModal, setSecurityModal] = useState<{ isOpen: boolean; score: number }>({ isOpen: false, score: 0 });
+  const [goldModal, setGoldModal] = useState<{ isOpen: boolean; title: string; description: string }>({ isOpen: false, title: '', description: '' });
 
   const showToast = useCallback((title: string, message: string, type: Notification['type'] = 'info') => {
     const id = Math.random().toString(36).substr(2, 9);
     setNotifications(prev => [...prev, { id, title, message, type }]);
+  }, []);
+
+  const showGoldSuccess = useCallback((title: string, description: string) => {
+    setGoldModal({ isOpen: true, title, description });
   }, []);
 
   const removeNotification = useCallback((id: string) => {
@@ -68,7 +74,6 @@ const App: React.FC = () => {
     window.addEventListener('offline', handleOffline);
 
     const userChannel = supabase.channel('user-sync').on('postgres_changes', { event: '*', schema: 'public', table: 'users_data' }, (payload) => {
-      // Fix: Cast payload.new and payload.old to any to avoid property 'id' access errors (App.tsx:71)
       if (user && ((payload.new as any)?.id === user.id || (payload.old as any)?.id === user.id)) loadSession();
     }).subscribe();
 
@@ -86,7 +91,6 @@ const App: React.FC = () => {
     await dbService.updateUser(updated.id, updated); 
   };
 
-  // VIP Expiration Logic (3 days = 259,200,000 ms)
   const vipExpiringSoon = useMemo(() => {
     if (!user?.isVip || !user?.vipUntil) return null;
     const diff = new Date(user.vipUntil).getTime() - new Date().getTime();
@@ -109,6 +113,12 @@ const App: React.FC = () => {
     <div className={`min-h-screen flex ${theme === 'dark' ? 'bg-[#06080c]' : 'bg-slate-50'} text-slate-200 transition-colors duration-500`}>
       <NovaNotification notifications={notifications} removeNotification={removeNotification} />
       {securityModal.isOpen && <NovaSecurityModal score={securityModal.score} onClose={() => setSecurityModal({ isOpen: false, score: 0 })} />}
+      <GoldModal 
+        isOpen={goldModal.isOpen} 
+        onClose={() => setGoldModal({ ...goldModal, isOpen: false })} 
+        title={goldModal.title} 
+        description={goldModal.description} 
+      />
 
       <aside className={`fixed inset-y-0 left-0 z-[100] w-72 glass-card border-r border-white/5 transform transition-transform md:relative md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="h-full flex flex-col p-8">
@@ -183,17 +193,17 @@ const App: React.FC = () => {
               switch (currentView) {
                 case AppView.DASHBOARD: return <Dashboard user={user} setView={setCurrentView} />;
                 case AppView.TASKS: return <Tasks user={user} onUpdateUser={updateUser} />;
-                case AppView.WITHDRAW: return <Withdraw user={user} onUpdateUser={updateUser} />;
-                case AppView.HISTORY: return <Withdraw user={user} onUpdateUser={updateUser} initialHistory={true} />;
+                case AppView.WITHDRAW: return <Withdraw user={user} onUpdateUser={updateUser} showGoldSuccess={showGoldSuccess} />;
+                case AppView.HISTORY: return <Withdraw user={user} onUpdateUser={updateUser} initialHistory={true} showGoldSuccess={showGoldSuccess} />;
                 case AppView.LEADERBOARD: return <Leaderboard />;
                 case AppView.PROFILE: return <Profile user={user} onUpdateUser={updateUser} />;
-                case AppView.GIFTCODE: return <Giftcode user={user} onUpdateUser={updateUser} />;
+                case AppView.GIFTCODE: return <Giftcode user={user} onUpdateUser={updateUser} showGoldSuccess={showGoldSuccess} />;
                 case AppView.REFERRAL: return <Referral user={user} />;
                 case AppView.ADMIN: return <Admin user={user} onUpdateUser={updateUser} setSecurityModal={setSecurityModal} showToast={showToast} />;
                 case AppView.GUIDE: return <Guide />;
                 case AppView.NOTIFICATIONS: return <UserNotifications user={user} />;
                 case AppView.SUPPORT: return <Support />;
-                case AppView.VIP: return <Vip user={user} onUpdateUser={updateUser} />;
+                case AppView.VIP: return <Vip user={user} onUpdateUser={updateUser} showGoldSuccess={showGoldSuccess} />;
                 default: return <Dashboard user={user} setView={setCurrentView} />;
               }
             })()

@@ -9,13 +9,13 @@ interface Props {
   user: User;
   onUpdateUser: (user: User) => void;
   initialHistory?: boolean;
+  showGoldSuccess: (title: string, description: string) => void;
 }
 
-const Withdraw: React.FC<Props> = ({ user, onUpdateUser, initialHistory = false }) => {
+const Withdraw: React.FC<Props> = ({ user, onUpdateUser, initialHistory = false, showGoldSuccess }) => {
   const [showHistory, setShowHistory] = useState(initialHistory);
   const [method, setMethod] = useState<'bank' | 'game' | null>(null);
   const [selectedMilestone, setSelectedMilestone] = useState<number | null>(null);
-  const [isSuccess, setIsSuccess] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [history, setHistory] = useState<WithdrawalRequest[]>([]);
 
@@ -65,7 +65,12 @@ const Withdraw: React.FC<Props> = ({ user, onUpdateUser, initialHistory = false 
       return;
     }
 
-    setIsSuccess(true);
+    // Hiển thị Gold Modal sang trọng thay vì UI success cũ
+    showGoldSuccess(
+      "GỬI YÊU CẦU THÀNH CÔNG",
+      `Yêu cầu rút thưởng trị giá ${selectedMilestone.toLocaleString()}đ đã được gửi tới hệ thống. Quà tặng sẽ được xử lý trong vòng 5-30 phút.`
+    );
+
     setMethod(null);
     setSelectedMilestone(null);
     
@@ -161,12 +166,12 @@ const Withdraw: React.FC<Props> = ({ user, onUpdateUser, initialHistory = false 
                   key={val} 
                   disabled={isLow} 
                   onClick={() => setSelectedMilestone(val)} 
-                  className={`p-6 rounded-[2rem] border-2 transition-all flex flex-col items-center gap-3 shadow-lg active:scale-95 group relative overflow-hidden ${isSelected ? 'border-emerald-500 bg-emerald-500/10' : 'border-slate-800 bg-slate-950/50 hover:border-slate-700'} ${isLow ? 'opacity-20 grayscale cursor-not-allowed' : ''}`}
+                  className={`p-6 rounded-[2rem] border-2 transition-all flex flex-col items-center gap-3 shadow-lg active:scale-95 group relative overflow-hidden ${isSelected ? 'border-[#d4af37] bg-[#d4af37]/10' : 'border-slate-800 bg-slate-950/50 hover:border-slate-700'} ${isLow ? 'opacity-20 grayscale cursor-not-allowed' : ''}`}
                 >
                   <div className="text-center space-y-1">
                     {method === 'game' ? (
                       <>
-                        <div className={`text-xl font-black italic tracking-tighter transition-colors ${isSelected ? 'text-emerald-400' : 'text-white'}`}>
+                        <div className={`text-xl font-black italic tracking-tighter transition-colors ${isSelected ? 'text-[#d4af37]' : 'text-white'}`}>
                           {getQuanHuyValue(val).toLocaleString()} Quân Huy
                         </div>
                         <div className="text-xs font-black text-blue-400 italic">
@@ -174,7 +179,7 @@ const Withdraw: React.FC<Props> = ({ user, onUpdateUser, initialHistory = false 
                         </div>
                       </>
                     ) : (
-                      <span className={`text-2xl font-black italic tracking-tighter transition-colors ${isSelected ? 'text-emerald-400' : 'text-white'}`}>
+                      <span className={`text-2xl font-black italic tracking-tighter transition-colors ${isSelected ? 'text-[#d4af37]' : 'text-white'}`}>
                         {(val/1000).toLocaleString()}kđ
                       </span>
                     )}
@@ -185,7 +190,7 @@ const Withdraw: React.FC<Props> = ({ user, onUpdateUser, initialHistory = false 
                     </span>
                     <span className="text-[9px] text-slate-600 font-bold">~ {(val).toLocaleString()}đ</span>
                   </div>
-                  {isSelected && <div className="absolute top-2 right-2 w-2 h-2 bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,1)] animate-pulse"></div>}
+                  {isSelected && <div className="absolute top-2 right-2 w-2 h-2 bg-[#d4af37] rounded-full shadow-[0_0_8px_rgba(212,175,55,1)] animate-pulse"></div>}
                 </button>
               );
             })}
@@ -194,11 +199,11 @@ const Withdraw: React.FC<Props> = ({ user, onUpdateUser, initialHistory = false 
           <div className="space-y-6">
             <div className="flex items-center justify-between px-6">
                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest italic">Số dư: <span className="text-white">{user.balance.toLocaleString()} P</span></span>
-               <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest italic">Yêu cầu: <span className={canAfford ? 'text-emerald-500' : 'text-red-500'}>{pointsNeeded.toLocaleString()} P</span></span>
+               <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest italic">Yêu cầu: <span className={canAfford ? 'text-[#d4af37]' : 'text-red-500'}>{pointsNeeded.toLocaleString()} P</span></span>
             </div>
 
             <div className="relative group">
-              <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
+              <div className="absolute -inset-1 bg-gradient-to-r from-[#d4af37] to-[#b08d26] rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
               <button 
                 onClick={handleWithdraw} 
                 disabled={!selectedMilestone || !canAfford || isProcessing} 
@@ -206,27 +211,13 @@ const Withdraw: React.FC<Props> = ({ user, onUpdateUser, initialHistory = false 
               >
                 {isProcessing ? <Loader2 className="animate-spin w-6 h-6 mx-auto" /> : (
                   <div className="flex items-center justify-center gap-3">
-                    <Wallet className="w-6 h-6 text-emerald-500" />
+                    <Wallet className="w-6 h-6 text-[#d4af37]" />
                     <span>XÁC NHẬN RÚT THƯỞNG</span>
                   </div>
                 )}
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {isSuccess && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 animate-in fade-in duration-300">
-           <div className="absolute inset-0 bg-black/90 backdrop-blur-xl" onClick={() => setIsSuccess(false)}></div>
-           <div className="glass-card p-12 rounded-[3.5rem] border border-emerald-500/30 text-center relative max-w-sm animate-in zoom-in-95 shadow-[0_0_80px_rgba(16,185,129,0.2)]">
-              <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-8 border border-emerald-500/30">
-                 <CheckCircle className="w-10 h-10 text-emerald-500" />
-              </div>
-              <h2 className="text-3xl font-black text-white uppercase italic mb-4">THÀNH CÔNG!</h2>
-              <p className="text-slate-400 font-medium italic mb-4">Yêu cầu rút thưởng game đã được gửi. Quà tặng Quân Huy / Kim Cương sẽ được gửi vào ID Game của bạn trong 5-30 phút.</p>
-              <button onClick={() => setIsSuccess(false)} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-5 rounded-2xl uppercase tracking-widest italic transition-all">OK, TÔI ĐÃ HIỂU</button>
-           </div>
         </div>
       )}
     </div>

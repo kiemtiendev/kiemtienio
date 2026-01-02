@@ -13,9 +13,10 @@ import {
 interface Props {
   user: User;
   onUpdateUser: (user: User) => void;
+  showGoldSuccess: (title: string, description: string) => void;
 }
 
-const Giftcode: React.FC<Props> = ({ user, onUpdateUser }) => {
+const Giftcode: React.FC<Props> = ({ user, onUpdateUser, showGoldSuccess }) => {
   const [code, setCode] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [msg, setMsg] = useState('');
@@ -26,11 +27,9 @@ const Giftcode: React.FC<Props> = ({ user, onUpdateUser }) => {
     setStatus('loading');
     
     try {
-      // Chuyển toàn bộ việc kiểm tra và cộng điểm vào dbService (Server-side check)
       const res = await dbService.claimGiftcode(user.id, cleanCode);
 
       if (res.success) {
-        // Cập nhật state User cục bộ sau khi DB đã cộng điểm thành công
         const updatedUser = { 
           ...user, 
           balance: user.balance + Number(res.amount || 0) 
@@ -40,6 +39,12 @@ const Giftcode: React.FC<Props> = ({ user, onUpdateUser }) => {
         setStatus('success');
         setMsg(res.message);
         setCode('');
+        
+        // Trình diễn Gold Modal sang trọng
+        showGoldSuccess(
+          "KÍCH HOẠT THÀNH CÔNG", 
+          `Hệ thống đã xác nhận mã quà tặng. Bạn vừa nhận được ${Number(res.amount).toLocaleString()} P vào tài khoản Nova.`
+        );
       } else {
         setStatus('error');
         setMsg(res.message);
@@ -54,7 +59,6 @@ const Giftcode: React.FC<Props> = ({ user, onUpdateUser }) => {
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Tự động chuẩn hóa code ngay khi nhập: viết hoa và xóa mọi khoảng trắng
     const val = e.target.value.toUpperCase().replace(/\s+/g, '');
     setCode(val);
   };

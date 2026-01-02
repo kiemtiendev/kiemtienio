@@ -13,9 +13,11 @@ import {
 interface Props {
   user: User;
   onUpdateUser: (user: User) => void;
+  // Add missing prop type to fix type error in App.tsx
+  showGoldSuccess: (title: string, description: string) => void;
 }
 
-const Vip: React.FC<Props> = ({ user, onUpdateUser }) => {
+const Vip: React.FC<Props> = ({ user, onUpdateUser, showGoldSuccess }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [vipHistory, setVipHistory] = useState<any[]>([]);
   const [vipLeaderboard, setVipLeaderboard] = useState<any[]>([]);
@@ -52,6 +54,7 @@ const Vip: React.FC<Props> = ({ user, onUpdateUser }) => {
     setBillFile(null);
   };
 
+  // Fixed handleBuyWithPoints to use showGoldSuccess for a better UI experience
   const handleBuyWithPoints = async () => {
     if (user.balance < selectedPkg.vnd * 10) return alert("Số dư Nova không đủ.");
     if (!confirm(`XÁC NHẬN: Dùng ${(selectedPkg.vnd * 10).toLocaleString()} P để nâng cấp ${selectedPkg.name}?`)) return;
@@ -63,10 +66,18 @@ const Vip: React.FC<Props> = ({ user, onUpdateUser }) => {
       if (updated) onUpdateUser(updated);
       setShowDepositModal(false);
       refreshData();
+      
+      // Use the luxury gold success modal instead of a standard alert
+      showGoldSuccess(
+        "NÂNG CẤP VIP THÀNH CÔNG",
+        `Chúc mừng! Bạn đã nâng cấp lên ${selectedPkg.name} thành công. Tận hưởng các quyền lợi đặc biệt ngay bây giờ.`
+      );
+    } else {
+      alert(res.message);
     }
-    alert(res.message);
   };
 
+  // Fixed handleBankSubmit to use showGoldSuccess for a better UI experience
   const handleBankSubmit = async () => {
     if (!billFile) return alert("Vui lòng tải ảnh bill chuyển khoản.");
     setIsLoading(true);
@@ -76,8 +87,17 @@ const Vip: React.FC<Props> = ({ user, onUpdateUser }) => {
       transfer_content: `N-VIP-${orderId}`, bill_url: billFile, status: 'pending', created_at: new Date().toISOString()
     });
     setIsLoading(false);
-    alert(res.message);
-    if (res.success) { setShowDepositModal(false); refreshData(); }
+    
+    if (res.success) { 
+      setShowDepositModal(false); 
+      refreshData();
+      showGoldSuccess(
+        "GỬI YÊU CẦU THÀNH CÔNG",
+        "Yêu cầu nâng cấp VIP qua chuyển khoản đã được gửi. Admin sẽ duyệt trong vòng 5-30 phút."
+      );
+    } else {
+      alert(res.message);
+    }
   };
 
   return (
