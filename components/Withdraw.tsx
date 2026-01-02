@@ -44,28 +44,30 @@ const Withdraw: React.FC<Props> = ({ user, onUpdateUser, initialHistory = false 
     if (!info) return alert(`Hãy cập nhật thông tin ${method === 'bank' ? 'ATM' : 'ID Game'} trong mục Hồ sơ.`);
     
     setIsProcessing(true);
-    setTimeout(async () => {
-      const request: Partial<WithdrawalRequest> = {
-        userId: user.id,
-        userName: `${user.fullname} (${user.email})`,
-        amount: selectedMilestone,
-        type: method,
-        status: 'pending',
-        details: info,
-        createdAt: new Date().toISOString()
-      };
-      await dbService.addWithdrawal(request);
-      
-      onUpdateUser({ ...user, balance: user.balance - pointsNeeded });
-      
-      setIsProcessing(false);
-      setIsSuccess(true);
-      setMethod(null);
-      setSelectedMilestone(null);
-      
-      const data = await dbService.getWithdrawals(user.id);
-      setHistory(data);
-    }, 1500);
+    // NOVA FIX: Chỉ gọi addWithdrawal, DB sẽ tự trừ tiền và App.tsx sẽ tự load lại User qua Real-time
+    const res = await dbService.addWithdrawal({
+      userId: user.id,
+      userName: `${user.fullname} (${user.email})`,
+      amount: selectedMilestone,
+      type: method,
+      status: 'pending',
+      details: info,
+      createdAt: new Date().toISOString()
+    });
+    
+    setIsProcessing(false);
+    
+    if (res && (res as any).error) {
+      alert((res as any).error);
+      return;
+    }
+
+    setIsSuccess(true);
+    setMethod(null);
+    setSelectedMilestone(null);
+    
+    const data = await dbService.getWithdrawals(user.id);
+    setHistory(data);
   };
 
   if (showHistory) {

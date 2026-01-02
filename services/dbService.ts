@@ -54,17 +54,19 @@ export const dbService = {
     const pointsFromGiftcodes = Number(u.total_giftcode_earned || 0);
     const pointsFromRefs = Number(u.referral_count || 0) * REFERRAL_REWARD;
 
-    // Tổng số điểm hợp lệ mà người dùng từng có (Nhiệm vụ + Giftcode + Mời bạn)
     const expectedTotal = pointsFromTasks + pointsFromGiftcodes + pointsFromRefs;
-    // Tổng số điểm thực tế (Số dư + Số đã/đang rút)
     const actualTotal = Number(u.balance || 0) + totalWithdrawnPoints;
 
-    // Tăng biên độ sai số lên 1000 P để tuyệt đối tránh ban nhầm do độ trễ đồng bộ
+    // PHÁT HIỆN NGHI VẤN GIAN LẬN
     if (actualTotal > expectedTotal + 1000) {
+      // TRỪ ĐIỂM TIN CẬY KHI CÓ NGHI VẤN
+      const newScore = Math.max(0, (u.security_score || 100) - 30);
+      await supabase.from('users_data').update({ security_score: newScore }).eq('id', userId);
+
       return { 
         isValid: false, 
         reason: `Mất cân đối: Thực tế (${actualTotal}) > Hợp lệ (${expectedTotal}). Chênh lệch: ${actualTotal - expectedTotal} P`,
-        score: u.security_score
+        score: newScore
       };
     }
 
@@ -72,9 +74,11 @@ export const dbService = {
   },
 
   autoBanUser: async (userId: string, reason: string) => {
+    // KHI BỊ BAN THÌ ĐIỂM TIN CẬY VỀ 0
     await supabase.from('users_data').update({ 
       is_banned: true, 
-      ban_reason: `SENTINEL_AUTO: ${reason}` 
+      ban_reason: `SENTINEL_AUTO: ${reason}`,
+      security_score: 0 
     }).eq('id', userId);
     
     await dbService.logActivity(userId, 'System', 'AUTO_BAN', reason);
@@ -150,7 +154,6 @@ export const dbService = {
     if (updates.balance !== undefined) dbUpdates.balance = updates.balance;
     if (updates.avatarUrl !== undefined) dbUpdates.avatar_url = updates.avatarUrl;
     
-    // Đảm bảo đồng bộ các trường Audit
     if (updates.totalEarned !== undefined) dbUpdates.total_earned = updates.totalEarned;
     if (updates.totalGiftcodeEarned !== undefined) dbUpdates.total_giftcode_earned = updates.totalGiftcodeEarned;
     if (updates.referralCount !== undefined) dbUpdates.referral_count = updates.referralCount;
@@ -160,17 +163,42 @@ export const dbService = {
     return await supabase.from('users_data').update(dbUpdates).eq('id', id);
   },
 
-  addPointsSecurely: async (id: string, timeElapsed: number) => {
+  addPointsSecurely: async (id: string, timeElapsed: number, points: number, gateName: string) => {
     if (timeElapsed < 15) {
       await dbService.autoBanUser(id, `Speed-Cheat: Vượt link quá nhanh (${timeElapsed}s)`);
       return { error: 'SENTINEL_SECURITY_VIOLATION' };
     }
 
-    const { error } = await supabase.rpc('secure_add_points', { 
+    // TRỪ ĐIỂM TIN CẬY NẾU LÀM NHANH (Nghi vấn dùng tool auto click)
+    if (timeElapsed < 25) {
+       const { data: user } = await supabase.from('users_data').select('security_score').eq('id', id).maybeSingle();
+       if (user) {
+         await supabase.from('users_data').update({ security_score: Math.max(0, (user.security_score || 100) - 5) }).eq('id', id);
+       }
+    }
+
+    const { error: rpcError } = await supabase.rpc('secure_add_points', { 
       target_id: id, 
       auth_key: SECURE_AUTH_KEY 
     });
-    return { error };
+
+    if (!rpcError) {
+       // Cập nhật thống kê tích lũy ngay trong DB để Audit chính xác
+       const { data: u } = await supabase.from('users_data').select('*').eq('id', id).maybeSingle();
+       if (u) {
+          const newCounts = { ...(u.task_counts || {}) };
+          newCounts[gateName] = (newCounts[gateName] || 0) + 1;
+          await supabase.from('users_data').update({
+            total_earned: (u.total_earned || 0) + points,
+            task_counts: newCounts,
+            tasks_today: (u.tasks_today || 0) + 1,
+            tasks_week: (u.tasks_week || 0) + 1,
+            last_task_date: new Date().toISOString()
+          }).eq('id', id);
+       }
+    }
+
+    return { error: rpcError };
   },
 
   claimGiftcode: async (userId: string, code: string): Promise<{ success: boolean, message: string, amount?: number }> => {
@@ -221,7 +249,6 @@ export const dbService = {
   },
 
   addWithdrawal: async (req: any) => {
-    // Chạy audit trước khi cho phép tạo lệnh rút
     const audit = await dbService.auditUserIntegrity(req.userId);
     if (!audit.isValid) {
       await dbService.autoBanUser(req.userId, `Audit-Failure: ${audit.reason}`);
@@ -234,6 +261,13 @@ export const dbService = {
     if (!user || user.balance < pointsNeeded) {
       return { error: 'INSUFFICIENT_BALANCE' };
     }
+
+    // NOVA FIX: THỰC HIỆN TRỪ TIỀN TRONG DB NGAY LẬP TỨC
+    const { error: deductError } = await supabase.from('users_data')
+      .update({ balance: user.balance - pointsNeeded })
+      .eq('id', req.userId);
+
+    if (deductError) return { error: 'LỖI CẬP NHẬT SỐ DƯ: ' + deductError.message };
 
     const { data: inserted, error } = await supabase.from('withdrawals').insert([{
       user_id: req.userId, user_name: req.userName, amount: req.amount, type: req.type, status: 'pending', details: req.details

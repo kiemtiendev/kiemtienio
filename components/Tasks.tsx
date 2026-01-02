@@ -104,8 +104,8 @@ const Tasks: React.FC<Props> = ({ user, onUpdateUser }) => {
         // Nova Sentinel: Tính thời gian thực hiện
         const timeElapsed = Math.floor((Date.now() - activeTask.timestamp) / 1000);
         
-        // Thực hiện cộng điểm bảo mật qua RPC + Sentinel Check
-        const { error } = await dbService.addPointsSecurely(user.id, timeElapsed);
+        // NOVA FIX: dbService sẽ tự cộng điểm và cập nhật thống kê tích lũy trong DB
+        const { error } = await dbService.addPointsSecurely(user.id, timeElapsed, activeTask.points, activeTask.gateName);
         
         if (error) {
            console.error("Sentinel Blocked:", error);
@@ -117,19 +117,6 @@ const Tasks: React.FC<Props> = ({ user, onUpdateUser }) => {
            return;
         }
 
-        const newTaskCounts = { ...user.taskCounts };
-        newTaskCounts[activeTask.gateName] = (newTaskCounts[activeTask.gateName] || 0) + 1;
-
-        const updatedUser = {
-          ...user,
-          balance: user.balance + activeTask.points,
-          totalEarned: (user.totalEarned || 0) + activeTask.points,
-          tasksToday: (user.tasksToday || 0) + 1,
-          taskCounts: newTaskCounts,
-          lastTaskDate: new Date().toISOString()
-        };
-
-        onUpdateUser(updatedUser);
         await dbService.logActivity(user.id, user.fullname, 'Hoàn thành nhiệm vụ', `+${activeTask.points} P (${timeElapsed}s)`);
         
         setStatus('success');
