@@ -22,7 +22,14 @@ export enum VipTier {
   ELITE = 'elite'  // > 500k
 }
 
-/* Added TaskGate interface for task management configuration */
+export interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'success' | 'error' | 'info' | 'warning' | 'security';
+  duration?: number;
+}
+
 export interface TaskGate {
   id: number;
   name: string;
@@ -31,7 +38,6 @@ export interface TaskGate {
   apiKey: string;
 }
 
-/* Added AdminNotification interface for system and user-specific messages */
 export interface AdminNotification {
   id: string;
   userId: string;
@@ -61,9 +67,8 @@ export interface User {
   lastLogin?: string;
   isBanned: boolean;
   isAdmin: boolean;
-  /* Added isVip property to satisfy UI logic in App.tsx */
   isVip: boolean;
-  vipUntil?: string; // ISO Date
+  vipUntil?: string; 
   vipTier: VipTier;
   banReason?: string;
   securityScore?: number;

@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { AppView, User, VipTier } from './types.ts';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { AppView, User, VipTier, Notification } from './types.ts';
 import { dbService, supabase } from './services/dbService.ts';
 import { NAV_ITEMS, formatK, SOCIAL_LINKS } from './constants.tsx';
 import { 
@@ -23,6 +23,7 @@ import UserNotifications from './components/UserNotifications.tsx';
 import Support from './components/Support.tsx';
 import GlobalSearch from './components/GlobalSearch.tsx';
 import Vip from './components/Vip.tsx';
+import NovaNotification, { NovaSecurityModal } from './components/NovaNotification.tsx';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -33,6 +34,19 @@ const App: React.FC = () => {
   const [hasNewNotif, setHasNewNotif] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>((localStorage.getItem('nova_theme') as 'light' | 'dark') || 'dark');
   const [isSocialMenuOpen, setIsSocialMenuOpen] = useState(false);
+  
+  // Notification State
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [securityModal, setSecurityModal] = useState<{ isOpen: boolean; score: number }>({ isOpen: false, score: 0 });
+
+  const showToast = useCallback((title: string, message: string, type: Notification['type'] = 'info') => {
+    const id = Math.random().toString(36).substr(2, 9);
+    setNotifications(prev => [...prev, { id, title, message, type }]);
+  }, []);
+
+  const removeNotification = useCallback((id: string) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
+  }, []);
 
   const loadSession = async () => {
     const sessionUser = await dbService.getCurrentUser();
@@ -50,8 +64,14 @@ const App: React.FC = () => {
 
   useEffect(() => {
     loadSession();
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
+    const handleOnline = () => {
+      setIsOnline(true);
+      showToast('HỆ THỐNG TRỰC TUYẾN', 'Kết nối Nova Cloud đã được khôi phục.', 'success');
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      showToast('MẤT KẾT NỐI', 'Bạn đang ở chế độ ngoại tuyến. Vui lòng kiểm tra internet.', 'error');
+    };
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
@@ -69,7 +89,7 @@ const App: React.FC = () => {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, (payload) => {
         if (user && (payload.new.user_id === user.id || payload.new.user_id === 'all')) {
           setHasNewNotif(true);
-          // Auto clear notification badge after a while
+          showToast('TIN NHẮN MỚI', payload.new.title, 'info');
           setTimeout(() => setHasNewNotif(false), 8000);
         }
       })
@@ -81,10 +101,11 @@ const App: React.FC = () => {
       supabase.removeChannel(userChannel);
       supabase.removeChannel(notifChannel);
     };
-  }, [user?.id]);
+  }, [user?.id, showToast]);
 
   const handleLoginSuccess = (u: User) => {
     setUser(u);
+    showToast('CHÀO MỪNG TRỞ LẠI', `Đăng nhập thành công, chào ${u.fullname}!`, 'success');
     setCurrentView(AppView.DASHBOARD);
   };
 
@@ -92,6 +113,7 @@ const App: React.FC = () => {
     dbService.logout(); 
     setUser(null); 
     setCurrentView(AppView.DASHBOARD);
+    showToast('ĐÃ ĐĂNG XUẤT', 'Hẹn gặp lại bạn sớm nhất!', 'info');
   };
 
   const updateUser = async (updated: User) => { 
@@ -105,7 +127,6 @@ const App: React.FC = () => {
     const until = new Date(user.vipUntil).getTime();
     const now = new Date().getTime();
     const diff = until - now;
-    // Notify if less than 24 hours (86,400,000 ms)
     if (diff > 0 && diff < 86400000) {
       const hours = Math.floor(diff / (1000 * 60 * 60));
       const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
@@ -147,7 +168,7 @@ const App: React.FC = () => {
       case AppView.PROFILE: return <Profile user={user} onUpdateUser={updateUser} />;
       case AppView.GIFTCODE: return <Giftcode user={user} onUpdateUser={updateUser} />;
       case AppView.REFERRAL: return <Referral user={user} />;
-      case AppView.ADMIN: return user.isAdmin ? <Admin user={user} onUpdateUser={updateUser} /> : <Dashboard user={user} setView={setCurrentView} />;
+      case AppView.ADMIN: return user.isAdmin ? <Admin user={user} onUpdateUser={updateUser} setSecurityModal={setSecurityModal} showToast={showToast} /> : <Dashboard user={user} setView={setCurrentView} />;
       case AppView.GUIDE: return <Guide />;
       case AppView.NOTIFICATIONS: return <UserNotifications user={user} />;
       case AppView.SUPPORT: return <Support />;
@@ -185,6 +206,14 @@ const App: React.FC = () => {
 
   return (
     <div className={`min-h-screen flex ${theme === 'dark' ? 'bg-[#06080c]' : 'bg-slate-50'} text-slate-200 transition-colors duration-500 relative`}>
+      <NovaNotification notifications={notifications} removeNotification={removeNotification} />
+      {securityModal.isOpen && (
+        <NovaSecurityModal 
+          score={securityModal.score} 
+          onClose={() => setSecurityModal({ isOpen: false, score: 0 })} 
+        />
+      )}
+
       <aside className={`fixed inset-y-0 left-0 z-[100] w-72 glass-card border-r border-white/5 transform transition-transform md:relative md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="h-full flex flex-col p-8">
           <div className="flex items-center justify-between mb-12 px-2">
