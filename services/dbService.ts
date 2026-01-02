@@ -106,22 +106,31 @@ export const dbService = {
     return await supabase.from('users_data').update(dbUpdates).eq('id', id);
   },
 
-  requestResetCode: async (email: string, telegramId: string) => {
-    const { data, error } = await supabase.from('users_data').select('id').eq('email', email).maybeSingle();
-    if (error || !data) return { success: false, message: 'Email không tồn tại.' };
-    const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
-    await supabase.from('users_data').update({ reset_code: resetCode }).eq('email', email);
-    return { success: true, message: `Mã đã gửi tới Telegram ID: ${telegramId}` };
+  requestResetCode: async (email: string, telegramUsername: string) => {
+    try {
+      const { data, error } = await supabase.from('users_data').select('id').eq('email', email).maybeSingle();
+      if (error || !data) return { success: false, message: 'Email không tồn tại.' };
+      
+      const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+      await supabase.from('users_data').update({ reset_code: resetCode }).eq('email', email);
+      
+      // Ghi nhật ký để Admin biết user nào vừa yêu cầu
+      await dbService.logActivity(data.id, email, 'Yêu cầu Reset mật khẩu', `Telegram: ${telegramUsername}`);
+      
+      return { success: true, message: `Mã đã được gửi tự động tới ${telegramUsername} qua Bot.` };
+    } catch (e: any) {
+      return { success: false, message: 'Lỗi máy chủ: ' + e.message };
+    }
   },
 
   resetPassword: async (email: string, code: string, newPass: string) => {
     const { data, error } = await supabase.from('users_data').select('reset_code').eq('email', email).maybeSingle();
-    if (error || !data) return { success: false, message: 'Lỗi xác thực.' };
+    if (error || !data) return { success: false, message: 'Lỗi xác thực dữ liệu.' };
     if (data.reset_code === code) {
       await supabase.from('users_data').update({ password_hash: btoa(newPass), reset_code: null }).eq('email', email);
       return { success: true, message: 'Đổi mật khẩu thành công.' };
     }
-    return { success: false, message: 'Mã xác minh sai.' };
+    return { success: false, message: 'Mã xác minh không chính xác.' };
   },
 
   getAllUsers: async () => {
@@ -164,9 +173,9 @@ export const dbService = {
       let q = supabase.from('announcements').select('*');
       if (!all) q = q.eq('is_active', true);
       const { data, error } = await q.order('created_at', { ascending: false });
-      return error ? handleDbError(error) : (data || []).map(a => ({ ...a, createdAt: a.created_at, isActive: a.is_active }));
+      if (error) throw error;
+      return (data || []).map(a => ({ ...a, createdAt: a.created_at, isActive: a.is_active }));
     } catch (e) {
-      // Dự phòng nếu cột created_at chưa được tạo
       const { data } = await supabase.from('announcements').select('*');
       return (data || []).map(a => ({ ...a, createdAt: a.created_at, isActive: a.is_active }));
     }
@@ -191,10 +200,11 @@ export const dbService = {
       let q = supabase.from('ads').select('*');
       if (!all) q = q.eq('is_active', true);
       const { data, error } = await q.order('created_at', { ascending: false });
-      return error ? handleDbError(error) : (data || []).map(ad => ({ ...ad, imageUrl: ad.image_url, targetUrl: ad.target_url, isActive: ad.is_active }));
+      if (error) throw error;
+      return (data || []).map(ad => ({ ...ad, imageUrl: ad.image_url, targetUrl: ad.target_url, isActive: ad.is_active }));
     } catch (e) {
       const { data } = await supabase.from('ads').select('*');
-      return (data || []).map(ad => ({ ...ad, imageUrl: ad.image_url, targetUrl: ad.target_url, isActive: ad.is_active }));
+      return (data || []).map(ad => ({ ...ad, imageUrl: ad.image_url, target_url: ad.target_url, isActive: ad.is_active }));
     }
   },
 
@@ -215,7 +225,8 @@ export const dbService = {
       let q = supabase.from('giftcodes').select('*');
       if (!all) q = q.eq('is_active', true);
       const { data, error } = await q.order('created_at', { ascending: false });
-      return error ? handleDbError(error) : (data || []).map(g => ({ ...g, maxUses: g.max_uses, usedBy: g.used_by || [], isActive: g.is_active }));
+      if (error) throw error;
+      return (data || []).map(g => ({ ...g, maxUses: g.max_uses, usedBy: g.used_by || [], isActive: g.is_active }));
     } catch (e) {
       const { data } = await supabase.from('giftcodes').select('*');
       return (data || []).map(g => ({ ...g, maxUses: g.max_uses, usedBy: g.used_by || [], isActive: g.is_active }));
@@ -243,7 +254,8 @@ export const dbService = {
   getActivityLogs: async () => {
     try {
       const { data, error } = await supabase.from('activity_logs').select('*').order('created_at', { ascending: false }).limit(50);
-      return error ? handleDbError(error) : (data || []).map(l => ({ ...l, createdAt: l.created_at }));
+      if (error) throw error;
+      return (data || []).map(l => ({ ...l, createdAt: l.created_at }));
     } catch (e) {
       const { data } = await supabase.from('activity_logs').select('*').limit(50);
       return (data || []).map(l => ({ ...l, createdAt: l.created_at }));

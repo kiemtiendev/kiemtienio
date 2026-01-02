@@ -21,7 +21,8 @@ import {
   ShieldAlert,
   ArrowLeft,
   Key,
-  Send
+  Send,
+  AtSign
 } from 'lucide-react';
 
 interface Props {
@@ -33,7 +34,7 @@ const Login: React.FC<Props> = ({ onLoginSuccess }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  const [telegramId, setTelegramId] = useState(''); // New state for Telegram ID
+  const [telegramUsername, setTelegramUsername] = useState(''); 
   const [referralCode, setReferralCode] = useState('');
   const [resetCode, setResetCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -101,12 +102,16 @@ const Login: React.FC<Props> = ({ onLoginSuccess }) => {
 
   const handleForgotStep1 = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !telegramId) return setError('Vui lòng nhập đầy đủ Email và Telegram ID.');
-    const res = await dbService.requestResetCode(email, telegramId);
+    if (!email || !telegramUsername) return setError('Vui lòng nhập đầy đủ Email và Telegram Username.');
+    if (!telegramUsername.startsWith('@')) return setError('Username Telegram phải bắt đầu bằng dấu @');
+    
+    const res = await dbService.requestResetCode(email, telegramUsername);
     if (res.success) {
       setIsResetStep2(true);
       setError('');
       setSuccessMsg(res.message);
+      // Mở bot tự động để người dùng nhận mã
+      window.open('https://t.me/anhvudev_kiemtienonline_bot', '_blank');
     } else {
       setError(res.message);
     }
@@ -224,7 +229,9 @@ const Login: React.FC<Props> = ({ onLoginSuccess }) => {
                            <MessageCircle className="w-5 h-5 text-blue-400" />
                            <span className="text-[10px] font-black text-white uppercase italic">XÁC THỰC TELEGRAM</span>
                         </div>
-                        <p className="text-[10px] text-slate-400 font-medium italic leading-relaxed">Để khôi phục, vui lòng nhập Gmail và Telegram ID của bạn để nhận mã xác minh.</p>
+                        <p className="text-[10px] text-slate-400 font-medium italic leading-relaxed">
+                          Nhập Username Telegram của bạn (bắt đầu bằng @). Hệ thống sẽ tự động dẫn hướng bạn tới Bot <b>@anhvudev_kiemtienonline_bot</b> để lấy mã.
+                        </p>
                      </div>
                      <div className="relative group">
                        <Mail className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 group-focus-within:text-blue-500 transition-colors" />
@@ -237,18 +244,18 @@ const Login: React.FC<Props> = ({ onLoginSuccess }) => {
                        />
                      </div>
                      <div className="relative group">
-                       <Send className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 group-focus-within:text-blue-500 transition-colors" />
+                       <AtSign className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 group-focus-within:text-blue-500 transition-colors" />
                        <input 
                          type="text" 
-                         value={telegramId} 
-                         onChange={e => setTelegramId(e.target.value)} 
-                         placeholder="ID TELEGRAM (VÍ DỤ: 12345678)" 
+                         value={telegramUsername} 
+                         onChange={e => setTelegramUsername(e.target.value)} 
+                         placeholder="USERNAME TELEGRAM (@...)" 
                          className="w-full bg-slate-900/50 border border-slate-800 rounded-2xl pl-14 pr-6 py-4 text-white font-black outline-none focus:border-blue-600 transition-all text-[11px] tracking-wider" 
                        />
                      </div>
                      <button className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-2xl shadow-xl shadow-blue-600/20 uppercase tracking-[0.2em] transition-all active:scale-95 flex items-center justify-center gap-3 italic text-[11px]">
-                       <span>GỬI MÃ XÁC MINH</span>
-                       <ArrowRight size={16} />
+                       <span>GỬI MÃ & MỞ BOT</span>
+                       <Send size={16} />
                      </button>
                    </>
                  ) : (
@@ -256,9 +263,9 @@ const Login: React.FC<Props> = ({ onLoginSuccess }) => {
                      <div className="bg-emerald-500/10 border border-emerald-500/20 p-5 rounded-2xl space-y-3">
                         <div className="flex items-center gap-3 text-emerald-400">
                            <Key className="w-5 h-5" />
-                           <span className="text-[10px] font-black uppercase italic">KIỂM TRA TIN NHẮN</span>
+                           <span className="text-[10px] font-black uppercase italic">KIỂM TRA TIN NHẮN BOT</span>
                         </div>
-                        <p className="text-[10px] text-slate-400 font-medium italic">Mã đã được gửi đến Telegram ID của bạn qua Bot Diamond Nova.</p>
+                        <p className="text-[10px] text-slate-400 font-medium italic">Vui lòng kiểm tra mã xác nhận tại <b>@anhvudev_kiemtienonline_bot</b>.</p>
                      </div>
                      <div className="relative group">
                        <ShieldCheck className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 group-focus-within:text-blue-500 transition-colors" />
