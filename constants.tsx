@@ -27,7 +27,9 @@ export const BLOG_DESTINATION = "https://diamondnova-rewards.blogspot.com/verify
 export const SOCIAL_LINKS = {
   facebook: "https://facebook.com/diamondnova",
   telegram: "https://t.me/VanhTRUM",
-  youtube: "https://youtube.com/@diamondnova"
+  telegramGroup: "https://t.me/diamondnova_group",
+  youtube: "https://youtube.com/@diamondnova",
+  zalo: "https://zalo.me/0337117930"
 };
 
 export const WITHDRAW_MILESTONES = [5000, 10000, 20000, 50000, 100000, 200000, 500000];

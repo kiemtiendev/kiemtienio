@@ -5,7 +5,7 @@ import { dbService, supabase } from './services/dbService.ts';
 import { NAV_ITEMS, formatK, SOCIAL_LINKS } from './constants.tsx';
 import { 
   Menu, LogOut, Sparkles, Bot, WifiOff, Bell, Activity, X, Star, Sun, Moon, 
-  Crown 
+  Crown, MessageCircle, Youtube, Send, MessageSquare, Plus
 } from 'lucide-react';
 
 // Components
@@ -32,6 +32,7 @@ const App: React.FC = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [hasNewNotif, setHasNewNotif] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>((localStorage.getItem('nova_theme') as 'light' | 'dark') || 'dark');
+  const [isSocialMenuOpen, setIsSocialMenuOpen] = useState(false);
 
   const loadSession = async () => {
     const sessionUser = await dbService.getCurrentUser();
@@ -141,7 +142,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className={`min-h-screen flex ${theme === 'dark' ? 'bg-[#06080c]' : 'bg-slate-50'} text-slate-200 transition-colors duration-500`}>
+    <div className={`min-h-screen flex ${theme === 'dark' ? 'bg-[#06080c]' : 'bg-slate-50'} text-slate-200 transition-colors duration-500 relative`}>
       <aside className={`fixed inset-y-0 left-0 z-[100] w-72 glass-card border-r border-white/5 transform transition-transform md:relative md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="h-full flex flex-col p-8">
           <div className="flex items-center justify-between mb-12 px-2">
@@ -204,6 +205,45 @@ const App: React.FC = () => {
         </header>
         <div className="max-w-6xl mx-auto">{renderView()}</div>
       </main>
+
+      {/* Floating Social Contact Menu */}
+      <div className="fixed bottom-6 right-6 z-[200] flex flex-col items-end gap-3">
+        {isSocialMenuOpen && (
+          <div className="flex flex-col gap-3 mb-3 animate-in slide-in-from-bottom-6 duration-300">
+            <a href={SOCIAL_LINKS.youtube} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 group">
+              <span className="bg-slate-900/80 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/5 text-[10px] font-black text-white uppercase italic opacity-0 group-hover:opacity-100 transition-opacity">Youtube</span>
+              <div className="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center text-white shadow-xl shadow-red-600/20 hover:scale-110 transition-all">
+                <Youtube size={20} />
+              </div>
+            </a>
+            <a href={SOCIAL_LINKS.zalo} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 group">
+              <span className="bg-slate-900/80 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/5 text-[10px] font-black text-white uppercase italic opacity-0 group-hover:opacity-100 transition-opacity">Zalo Hỗ Trợ</span>
+              <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center text-white shadow-xl shadow-blue-500/20 hover:scale-110 transition-all">
+                <MessageSquare size={20} />
+              </div>
+            </a>
+            <a href={SOCIAL_LINKS.telegram} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 group">
+              <span className="bg-slate-900/80 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/5 text-[10px] font-black text-white uppercase italic opacity-0 group-hover:opacity-100 transition-opacity">Telegram Admin</span>
+              <div className="w-12 h-12 bg-sky-500 rounded-full flex items-center justify-center text-white shadow-xl shadow-sky-500/20 hover:scale-110 transition-all">
+                <Send size={20} />
+              </div>
+            </a>
+            <a href={SOCIAL_LINKS.telegramGroup} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 group">
+              <span className="bg-slate-900/80 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/5 text-[10px] font-black text-white uppercase italic opacity-0 group-hover:opacity-100 transition-opacity">Group Thảo Luận</span>
+              <div className="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center text-white shadow-xl shadow-black/20 hover:scale-110 transition-all border border-white/5">
+                <MessageCircle size={20} />
+              </div>
+            </a>
+          </div>
+        )}
+        <button 
+          onClick={() => setIsSocialMenuOpen(!isSocialMenuOpen)}
+          className={`w-14 h-14 rounded-full flex items-center justify-center text-white shadow-2xl transition-all active:scale-90 ${isSocialMenuOpen ? 'bg-rose-600 rotate-45' : 'bg-blue-600'}`}
+        >
+          {isSocialMenuOpen ? <Plus size={28} /> : <MessageSquare size={24} />}
+          {!isSocialMenuOpen && <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full animate-ping"></span>}
+        </button>
+      </div>
     </div>
   );
 };
