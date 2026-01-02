@@ -2,11 +2,18 @@
 import { BLOG_DESTINATION, TASK_RATES } from '../constants.tsx';
 
 /**
- * Nova Cloud Link Extractor v12.2:
- * - Tối ưu hóa đặc biệt cho LINK4M (JSON v2) và LAYMANET (Text format).
- * - Sử dụng cơ chế bóc tách đa tầng (JSON -> Text -> Regex).
- * - Đảm bảo mở trực tiếp link rút gọn cuối cùng.
+ * Nova Cloud Link Extractor v12.6:
+ * - Multi-proxy fallback (AllOrigins -> CorsProxy.io).
+ * - Tối ưu hóa đặc biệt cho LAYMANET và các cổng JSON.
+ * - Xử lý lỗi "Failed to fetch" bằng cơ chế retry tự động.
  */
+
+// Danh sách các Proxy hỗ trợ vượt CORS
+const PROXIES = [
+  (url: string) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}&timestamp=${Date.now()}`,
+  (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`
+];
+
 export const openTaskLink = async (taskId: number, userId: string, token: string) => {
   const task = TASK_RATES[taskId];
   if (!task) return;
@@ -16,7 +23,7 @@ export const openTaskLink = async (taskId: number, userId: string, token: string
   let isDirectRedirect = false;
   let preferredFormat = "json";
 
-  // Cấu hình API Endpoint tối ưu
+  // Cấu hình API Endpoint theo từng cổng
   switch(taskId) {
     case 1: // LINK4M
       apiUrl = `https://link4m.co/api-shorten/v2?api=${task.apiKey}&url=${dest}`; 
@@ -34,15 +41,15 @@ export const openTaskLink = async (taskId: number, userId: string, token: string
       apiUrl = `https://services.traffictot.com/api/v1/shorten/redirect?api_key=${task.apiKey}&url=${dest}`;
       isDirectRedirect = true;
       break;
-    case 6: // LAYMANET - Chuyển sang format=text để lấy link trực tiếp
-      apiUrl = `https://api.layma.net/api/admin/shortlink/quicklink?tokenUser=${task.apiKey}&format=text&url=${dest}`; 
-      preferredFormat = "text";
+    case 6: // LAYMANET
+      apiUrl = `https://api.layma.net/api/admin/shortlink/quicklink?tokenUser=${task.apiKey}&format=json&url=${dest}&link_du_phong=${encodeURIComponent(BLOG_DESTINATION)}`; 
+      preferredFormat = "json";
       break;
   }
 
   if (!apiUrl) return;
 
-  // Bước 1: Mở cửa sổ trung gian
+  // Mở cửa sổ trung gian ngay lập tức để tránh bị Pop-up blocker chặn
   const newWindow = window.open('about:blank', '_blank');
   if (newWindow) {
     newWindow.document.write(`
@@ -52,29 +59,19 @@ export const openTaskLink = async (taskId: number, userId: string, token: string
         <meta charset="UTF-8">
         <title>Nova Cloud Sync - Đang kết nối...</title>
         <style>
-          body { background: #03050a; color: #3b82f6; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; font-family: 'Inter', -apple-system, sans-serif; overflow: hidden; }
-          .loader-container { position: relative; width: 100px; height: 100px; }
-          .loader { border: 4px solid rgba(59, 130, 246, 0.05); border-top: 4px solid #3b82f6; border-radius: 50%; width: 100%; height: 100%; animation: spin 1s cubic-bezier(0.5, 0, 0.5, 1) infinite; }
-          .inner-glow { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 40px; height: 40px; background: #3b82f6; border-radius: 50%; filter: blur(20px); opacity: 0.3; animation: pulse 2s infinite; }
+          body { background: #03050a; color: #3b82f6; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; font-family: 'Inter', sans-serif; overflow: hidden; }
+          .loader { border: 4px solid rgba(59, 130, 246, 0.05); border-top: 4px solid #3b82f6; border-radius: 50%; width: 80px; height: 80px; animation: spin 1s linear infinite; }
           @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-          @keyframes pulse { 0%, 100% { opacity: 0.2; transform: translate(-50%, -50%) scale(1); } 50% { opacity: 0.5; transform: translate(-50%, -50%) scale(1.5); } }
-          .text { margin-top: 40px; text-transform: uppercase; font-weight: 900; font-style: italic; letter-spacing: 6px; font-size: 16px; text-shadow: 0 0 20px rgba(59, 130, 246, 0.5); }
-          .sub-text { margin-top: 15px; color: #64748b; font-size: 11px; font-weight: 700; letter-spacing: 2px; text-align: center; max-width: 300px; line-height: 1.6; }
-          .progress { width: 240px; height: 3px; background: rgba(255,255,255,0.03); margin-top: 40px; position: relative; overflow: hidden; border-radius: 10px; }
-          .progress-bar { position: absolute; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, #3b82f6, transparent); animation: loading 1.5s infinite; }
-          @keyframes loading { 0% { left: -100%; } 100% { left: 100%; } }
-          .error-msg { display: none; margin-top: 30px; color: #ef4444; font-size: 12px; font-weight: 900; background: rgba(239, 68, 68, 0.1); padding: 15px 30px; border-radius: 15px; border: 1px solid rgba(239, 68, 68, 0.2); text-align: center; }
+          .text { margin-top: 30px; font-weight: 900; font-style: italic; letter-spacing: 4px; font-size: 14px; text-transform: uppercase; }
+          .sub { color: #64748b; font-size: 10px; margin-top: 10px; text-align: center; max-width: 250px; }
+          .error { display: none; margin-top: 20px; color: #ef4444; font-size: 11px; background: rgba(239, 68, 68, 0.1); padding: 10px 20px; border-radius: 10px; border: 1px solid rgba(239, 68, 68, 0.2); text-align: center; }
         </style>
       </head>
       <body>
-        <div class="loader-container">
-          <div class="loader"></div>
-          <div class="inner-glow"></div>
-        </div>
+        <div class="loader"></div>
         <div class="text">NOVA SYNC</div>
-        <div id="status" class="sub-text">ĐANG KẾT NỐI MÁY CHỦ ${task.name}...</div>
-        <div class="progress"><div class="progress-bar"></div></div>
-        <div id="error" class="error-msg">LỖI ĐỒNG BỘ NOVA CLOUD!<br>VUI LÒNG KIỂM TRA LẠI KEY API HOẶC THỬ LẠI SAU.</div>
+        <div id="status" class="sub">ĐANG THIẾT LẬP KẾT NỐI AN TOÀN ĐẾN ${task.name}...</div>
+        <div id="error" class="error">LỖI: KHÔNG THỂ KẾT NỐI VỚI MÁY CHỦ QUẢNG CÁO.</div>
       </body>
       </html>
     `);
@@ -85,26 +82,47 @@ export const openTaskLink = async (taskId: number, userId: string, token: string
     return;
   }
 
-  // Sử dụng Proxy để vượt CORS
-  const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}&timestamp=${Date.now()}`;
+  /**
+   * Hàm thực hiện Fetch qua Proxy với cơ chế Fallback
+   */
+  const fetchWithFallback = async (url: string) => {
+    let lastError = null;
+
+    for (let i = 0; i < PROXIES.length; i++) {
+      try {
+        const proxyUrl = PROXIES[i](url);
+        console.log(`Nova Sync: Attempting via Proxy ${i + 1}...`);
+        
+        const response = await fetch(proxyUrl, { method: 'GET' });
+        if (!response.ok) throw new Error(`Proxy ${i + 1} returned ${response.status}`);
+        
+        const result = await response.json();
+        
+        // Xử lý dữ liệu trả về từ AllOrigins (result.contents) hoặc các proxy trực tiếp khác
+        const content = result.contents !== undefined ? result.contents : JSON.stringify(result);
+        if (!content) throw new Error("Empty response content");
+        
+        return content;
+      } catch (err) {
+        console.warn(`Nova Sync: Proxy ${i + 1} failed:`, err);
+        lastError = err;
+      }
+    }
+    throw lastError || new Error("All proxies failed");
+  };
 
   try {
-    const response = await fetch(proxyUrl);
-    if (!response.ok) throw new Error("CORS Proxy error");
-    
-    const proxyData = await response.json();
-    if (!proxyData.contents) throw new Error("API returned no content");
-    
+    const rawContent = await fetchWithFallback(apiUrl);
+    const cleanContent = rawContent.trim();
     let realLink = "";
-    const rawContent = proxyData.contents.trim();
 
-    // Nếu format là text (như LaymaNet), content chính là link
-    if (preferredFormat === "text" && rawContent.startsWith('http')) {
-      realLink = rawContent;
+    // Giai đoạn trích xuất Link
+    if (preferredFormat === "text" && cleanContent.startsWith('http')) {
+      realLink = cleanContent;
     } else {
       try {
-        const data = JSON.parse(rawContent);
-        // Ưu tiên bóc tách theo thứ tự cấu trúc phổ biến của các cổng
+        const data = JSON.parse(cleanContent);
+        // Trích xuất từ các cấu trúc JSON phổ biến
         realLink = 
           data.shortenedUrl || 
           data.shortlink || 
@@ -113,30 +131,35 @@ export const openTaskLink = async (taskId: number, userId: string, token: string
           (data.data && (data.data.shortenedUrl || data.data.shortlink || data.data.url || data.data.link)) ||
           (data.result && (data.result.shortenedUrl || data.result.shortlink));
       } catch (e) {
-        // Fallback: Tìm link bằng Regex nếu không phải JSON
-        const urlMatch = rawContent.match(/https?:\/\/[^\s"'<>]+/);
+        // Fallback: Tìm bằng Regex
+        const urlMatch = cleanContent.match(/https?:\/\/[^\s"'<>]+/);
         if (urlMatch) realLink = urlMatch[0];
       }
     }
 
-    // Làm sạch link: xóa các ký tự thừa
     if (realLink) {
         realLink = realLink.replace(/["']/g, '');
     }
 
-    // Chuyển hướng nếu hợp lệ
+    // Kiểm tra tính hợp lệ và chuyển hướng
     if (realLink && realLink.startsWith('http') && !realLink.includes('api-shorten') && !realLink.includes('quicklink')) {
+      console.log("Nova Sync: Link extracted successfully ->", realLink);
       if (newWindow) {
         newWindow.location.href = realLink;
       }
     } else {
-      throw new Error("Invalid final link extracted");
+      throw new Error("Could not find a valid shortlink in the response");
     }
-  } catch (error) {
-    console.error("Nova Sync Error:", error);
+  } catch (error: any) {
+    console.error("Nova Sync Ultimate Error:", error);
     if (newWindow) {
-      newWindow.document.getElementById('status')!.innerText = "KHÔNG THỂ TRÍCH XUẤT LIÊN KẾT.";
-      newWindow.document.getElementById('error')!.style.display = 'block';
+      const statusEl = newWindow.document.getElementById('status');
+      const errorEl = newWindow.document.getElementById('error');
+      if (statusEl) statusEl.innerText = "KẾT NỐI BỊ GIÁN ĐOẠN.";
+      if (errorEl) {
+        errorEl.style.display = 'block';
+        errorEl.innerText = `LỖI ĐỒNG BỘ: ${error.message || "Failed to fetch"}. Vui lòng thử lại hoặc tắt trình chặn quảng cáo.`;
+      }
     }
   }
 };
