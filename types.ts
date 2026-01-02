@@ -70,6 +70,7 @@ export interface WithdrawalRequest {
   status: 'pending' | 'completed' | 'rejected';
   details: string;
   createdAt: string;
+  securityScore?: number;
 }
 
 export interface Announcement {

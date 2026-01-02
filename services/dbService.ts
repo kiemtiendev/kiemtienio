@@ -41,35 +41,29 @@ const handleDbError = (err: any, fallback: any = []) => {
 };
 
 export const dbService = {
-  /**
-   * NOVA SENTINEL: Kiểm tra tính toàn vẹn của số dư
-   * Giúp phân biệt điểm hợp lệ và điểm Bug
-   */
-  auditUserIntegrity: async (userId: string): Promise<{ isValid: boolean, reason?: string }> => {
+  auditUserIntegrity: async (userId: string): Promise<{ isValid: boolean, reason?: string, score?: number }> => {
     const { data: u, error } = await supabase.from('users_data').select('*').eq('id', userId).maybeSingle();
     if (error || !u) return { isValid: false, reason: "Không tìm thấy dữ liệu hội viên" };
 
-    // Lấy tổng số tiền đã rút thành công hoặc đang chờ
     const { data: withdrawals } = await supabase.from('withdrawals').select('amount').eq('user_id', userId).neq('status', 'rejected');
     const totalWithdrawnPoints = (withdrawals || []).reduce((sum, w) => sum + (Number(w.amount) * RATE_VND_TO_POINT), 0);
 
-    // Tính toán số điểm "đáng lẽ phải có" dựa trên lịch sử
-    const pointsFromTasks = Number(u.total_earned || 0); // Đây là tổng điểm từ nhiệm vụ đã cộng qua RPC
+    const pointsFromTasks = Number(u.total_earned || 0);
     const pointsFromGiftcodes = Number(u.total_giftcode_earned || 0);
     const pointsFromRefs = Number(u.referral_count || 0) * REFERRAL_REWARD;
 
     const expectedTotal = pointsFromTasks + pointsFromGiftcodes + pointsFromRefs;
     const actualTotal = Number(u.balance || 0) + totalWithdrawnPoints;
 
-    // Cho phép sai số nhỏ (ví dụ 100 điểm) để tránh các vấn đề làm tròn
     if (actualTotal > expectedTotal + 100) {
       return { 
         isValid: false, 
-        reason: `Mất cân đối: Thực tế (${actualTotal}) > Hợp lệ (${expectedTotal}). Chênh lệch: ${actualTotal - expectedTotal} P` 
+        reason: `Mất cân đối: Thực tế (${actualTotal}) > Hợp lệ (${expectedTotal}). Chênh lệch: ${actualTotal - expectedTotal} P`,
+        score: u.security_score
       };
     }
 
-    return { isValid: true };
+    return { isValid: true, score: u.security_score };
   },
 
   autoBanUser: async (userId: string, reason: string) => {
@@ -173,12 +167,10 @@ export const dbService = {
       if (usedBy.includes(userId)) return { success: false, message: 'Bạn đã sử dụng mã này rồi.' };
       if (usedBy.length >= gc.max_uses) return { success: false, message: 'Mã đã hết lượt nhập.' };
 
-      // Cập nhật Giftcode và cộng điểm User theo cơ chế Audit
       const newUsedBy = [...usedBy, userId];
       const { error: updGcErr } = await supabase.from('giftcodes').update({ used_by: newUsedBy }).eq('code', gc.code);
       if (updGcErr) throw updGcErr;
 
-      // Cộng điểm và ghi nhận vào total_giftcode_earned để Audit
       const { data: user } = await supabase.from('users_data').select('balance, total_giftcode_earned').eq('id', userId).maybeSingle();
       if (user) {
         await supabase.from('users_data').update({
@@ -201,30 +193,49 @@ export const dbService = {
   },
 
   getWithdrawals: async (userId?: string) => {
-    let q = supabase.from('withdrawals').select('*').order('created_at', { ascending: false });
+    // NOVA ENHANCEMENT: Join users_data to get security_score
+    let q = supabase.from('withdrawals').select('*, users_data(security_score)').order('created_at', { ascending: false });
     if (userId) q = q.eq('user_id', userId);
     const { data, error } = await q;
-    return error ? handleDbError(error) : (data || []).map(w => ({ ...w, userId: w.user_id, userName: w.user_name, createdAt: w.created_at }));
+    return error ? handleDbError(error) : (data || []).map(w => ({ 
+      ...w, 
+      userId: w.user_id, 
+      userName: w.user_name, 
+      createdAt: w.created_at,
+      securityScore: w.users_data?.security_score ?? 100
+    }));
   },
 
   addWithdrawal: async (req: any) => {
-    // NOVA SENTINEL: Kiểm tra Audit Integrity trước khi rút
     const audit = await dbService.auditUserIntegrity(req.userId);
     if (!audit.isValid) {
       await dbService.autoBanUser(req.userId, `Audit-Failure: ${audit.reason}`);
       return { error: 'SECURITY_AUDIT_FAILED' };
     }
 
-    const { data: user } = await supabase.from('users_data').select('balance').eq('id', req.userId).maybeSingle();
+    const { data: user } = await supabase.from('users_data').select('balance, security_score').eq('id', req.userId).maybeSingle();
     const pointsNeeded = Number(req.amount) * RATE_VND_TO_POINT;
     
     if (!user || user.balance < pointsNeeded) {
       return { error: 'INSUFFICIENT_BALANCE' };
     }
 
-    return await supabase.from('withdrawals').insert([{
+    const { error } = await supabase.from('withdrawals').insert([{
       user_id: req.userId, user_name: req.userName, amount: req.amount, type: req.type, status: 'pending', details: req.details
     }]);
+
+    if (!error) {
+      // NOVA ALERT: Send notification to admin with security score
+      await dbService.addNotification({
+        type: 'withdrawal',
+        title: 'YÊU CẦU RÚT TIỀN MỚI',
+        content: `Người dùng ${req.userName} yêu cầu rút ${req.amount.toLocaleString()}đ. ĐIỂM TIN CẬY: ${user.security_score}%`,
+        userId: 'all',
+        userName: req.userName
+      });
+    }
+
+    return { error };
   },
 
   updateWithdrawalStatus: async (id: string, status: 'completed' | 'rejected') => {
@@ -280,7 +291,7 @@ export const dbService = {
     let q = supabase.from('ads').select('*');
     if (!all) q = q.eq('is_active', true);
     const { data, error } = await q.order('created_at', { ascending: false });
-    return error ? handleDbError(error) : (data || []).map(ad => ({ ...ad, imageUrl: ad.image_url, targetUrl: ad.target_url, isActive: ad.is_active }));
+    return error ? handleDbError(error) : (data || []).map(ad => ({ ...ad, imageUrl: ad.image_url, target_url: ad.target_url, isActive: ad.is_active }));
   },
 
   saveAd: async (ad: any) => {
