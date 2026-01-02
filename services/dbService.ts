@@ -57,10 +57,11 @@ export const dbService = {
     const expectedTotal = pointsFromTasks + pointsFromGiftcodes + pointsFromRefs;
     const actualTotal = Number(u.balance || 0) + totalWithdrawnPoints;
 
-    // PHÁT HIỆN NGHI VẤN GIAN LẬN
+    // PHÁT HIỆN NGHI VẤN GIAN LẬN (Thực tế > Hợp lệ)
     if (actualTotal > expectedTotal + 1000) {
-      // TRỪ ĐIỂM TIN CẬY KHI CÓ NGHI VẤN
-      const newScore = Math.max(0, (u.security_score || 100) - 30);
+      // TRỪ MẠNH ĐIỂM TIN CẬY KHI CÓ NGHI VẤN
+      const currentScore = Number(u.security_score || 100);
+      const newScore = Math.max(0, currentScore - 30);
       await supabase.from('users_data').update({ security_score: newScore }).eq('id', userId);
 
       return { 
@@ -74,7 +75,7 @@ export const dbService = {
   },
 
   autoBanUser: async (userId: string, reason: string) => {
-    // KHI BỊ BAN THÌ ĐIỂM TIN CẬY VỀ 0
+    // KHI BỊ BAN THÌ ĐIỂM TIN CẬY VỀ 0 TUYỆT ĐỐI
     await supabase.from('users_data').update({ 
       is_banned: true, 
       ban_reason: `SENTINEL_AUTO: ${reason}`,
@@ -150,7 +151,7 @@ export const dbService = {
     if (updates.tasksWeek !== undefined) dbUpdates.tasks_week = updates.tasksWeek;
     if (updates.lastTaskDate !== undefined) dbUpdates.last_task_date = updates.lastTaskDate;
     if (updates.bankInfo !== undefined) dbUpdates.bank_info = updates.bankInfo;
-    if (updates.idGame !== undefined) dbUpdates.id_game = updates.idGame;
+    if (updates.idGame !== undefined) dbUpdates.id_game = updates.id_game;
     if (updates.balance !== undefined) dbUpdates.balance = updates.balance;
     if (updates.avatarUrl !== undefined) dbUpdates.avatar_url = updates.avatarUrl;
     
@@ -169,11 +170,12 @@ export const dbService = {
       return { error: 'SENTINEL_SECURITY_VIOLATION' };
     }
 
-    // TRỪ ĐIỂM TIN CẬY NẾU LÀM NHANH (Nghi vấn dùng tool auto click)
+    // TRỪ ĐIỂM TIN CẬY NẾU LÀM QUÁ NHANH (Nghi vấn dùng tool)
     if (timeElapsed < 25) {
        const { data: user } = await supabase.from('users_data').select('security_score').eq('id', id).maybeSingle();
        if (user) {
-         await supabase.from('users_data').update({ security_score: Math.max(0, (user.security_score || 100) - 5) }).eq('id', id);
+         const currentScore = Number(user.security_score || 100);
+         await supabase.from('users_data').update({ security_score: Math.max(0, currentScore - 5) }).eq('id', id);
        }
     }
 
@@ -183,7 +185,6 @@ export const dbService = {
     });
 
     if (!rpcError) {
-       // Cập nhật thống kê tích lũy ngay trong DB để Audit chính xác
        const { data: u } = await supabase.from('users_data').select('*').eq('id', id).maybeSingle();
        if (u) {
           const newCounts = { ...(u.task_counts || {}) };
@@ -256,28 +257,37 @@ export const dbService = {
     }
 
     const { data: user } = await supabase.from('users_data').select('balance, security_score').eq('id', req.userId).maybeSingle();
-    const pointsNeeded = Number(req.amount) * RATE_VND_TO_POINT;
+    const amountVal = Number(req.amount);
+    const pointsNeeded = amountVal * RATE_VND_TO_POINT;
     
     if (!user || user.balance < pointsNeeded) {
       return { error: 'INSUFFICIENT_BALANCE' };
     }
 
-    // NOVA FIX: THỰC HIỆN TRỪ TIỀN TRONG DB NGAY LẬP TỨC
+    // NOVA FIX: Trừ tiền trước khi tạo lệnh
     const { error: deductError } = await supabase.from('users_data')
-      .update({ balance: user.balance - pointsNeeded })
+      .update({ balance: Number(user.balance) - pointsNeeded })
       .eq('id', req.userId);
 
     if (deductError) return { error: 'LỖI CẬP NHẬT SỐ DƯ: ' + deductError.message };
 
     const { data: inserted, error } = await supabase.from('withdrawals').insert([{
-      user_id: req.userId, user_name: req.userName, amount: req.amount, type: req.type, status: 'pending', details: req.details
+      user_id: req.userId, 
+      user_name: req.userName, 
+      amount: amountVal, 
+      type: req.type, 
+      status: 'pending', 
+      details: req.details
     }]).select().single();
 
     if (!error && inserted) {
+      // NOVA FIX: Ép kiểu Number cho inserted.amount để toLocaleString hiển thị đúng số tiền
+      const displayAmount = Number(inserted.amount).toLocaleString();
+      
       await dbService.addNotification({
         type: 'withdrawal',
         title: 'YÊU CẦU RÚT TIỀN MỚI',
-        content: `ID: #${inserted.id} - ${req.userName} rút ${req.amount.toLocaleString()}đ. ĐIỂM TIN CẬY: ${user.security_score}%`,
+        content: `ID: #${inserted.id} - ${req.userName} rút ${displayAmount}đ. ĐIỂM TIN CẬY: ${user.security_score}%`,
         userId: 'all',
         userName: req.userName
       });
