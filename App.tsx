@@ -18,7 +18,9 @@ import {
   Moon,
   Youtube,
   MessageCircle,
-  ExternalLink
+  ExternalLink,
+  PhoneCall,
+  SendHorizontal
 } from 'lucide-react';
 
 // Components
@@ -262,8 +264,8 @@ const App: React.FC = () => {
         </div>
 
         {/* Floating Actions & Online Status Badge */}
-        <div className="fixed bottom-6 right-6 z-[60] flex flex-col items-end gap-4 pointer-events-none">
-          {/* Floating Social Icons */}
+        <div className="fixed bottom-6 right-6 z-[60] flex flex-col items-end gap-3 pointer-events-none">
+          {/* Floating Social & Support Icons */}
           <div className="flex flex-col gap-3 pointer-events-auto">
             <a 
               href={SOCIAL_LINKS.YOUTUBE} 
@@ -275,13 +277,32 @@ const App: React.FC = () => {
               <div className="absolute right-full mr-3 px-3 py-1 bg-black/80 rounded-lg text-[9px] font-black text-white uppercase italic tracking-widest whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none border border-white/5">HƯỚNG DẪN VIDEO</div>
             </a>
             <a 
-              href={SOCIAL_LINKS.TELEGRAM} 
+              href={SOCIAL_LINKS.TELEGRAM_GROUP} 
               target="_blank" 
               className="w-12 h-12 bg-blue-600/20 backdrop-blur-xl border border-blue-500/30 rounded-full flex items-center justify-center text-blue-500 shadow-lg shadow-blue-600/10 hover:bg-blue-600 hover:text-white transition-all hover:scale-110 group relative"
               title="Tham gia cộng đồng"
             >
               <MessageCircle size={20} />
               <div className="absolute right-full mr-3 px-3 py-1 bg-black/80 rounded-lg text-[9px] font-black text-white uppercase italic tracking-widest whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none border border-white/5">CỘNG ĐỒNG NOVA</div>
+            </a>
+            <div className="h-px w-8 bg-white/10 mx-auto my-1"></div>
+            <a 
+              href={SOCIAL_LINKS.ZALO_ADMIN} 
+              target="_blank" 
+              className="w-10 h-10 bg-blue-400/20 backdrop-blur-xl border border-blue-400/30 rounded-full flex items-center justify-center text-blue-400 shadow-lg hover:bg-blue-400 hover:text-white transition-all group relative"
+              title="Zalo Admin 0337117930"
+            >
+              <PhoneCall size={16} />
+              <div className="absolute right-full mr-3 px-3 py-1 bg-black/80 rounded-lg text-[8px] font-black text-white uppercase italic tracking-widest whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none border border-white/5">ZALO ADMIN</div>
+            </a>
+            <a 
+              href={SOCIAL_LINKS.TELEGRAM_ADMIN} 
+              target="_blank" 
+              className="w-10 h-10 bg-blue-600/20 backdrop-blur-xl border border-blue-500/30 rounded-full flex items-center justify-center text-blue-500 shadow-lg hover:bg-blue-600 hover:text-white transition-all group relative"
+              title="Telegram Admin @VanhTRUM"
+            >
+              <SendHorizontal size={16} />
+              <div className="absolute right-full mr-3 px-3 py-1 bg-black/80 rounded-lg text-[8px] font-black text-white uppercase italic tracking-widest whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none border border-white/5">TELE ADMIN</div>
             </a>
           </div>
 

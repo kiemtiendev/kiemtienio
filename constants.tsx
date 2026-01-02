@@ -30,7 +30,9 @@ export const BLOG_DESTINATION = "https://avudev-verifi.blogspot.com/";
 
 export const SOCIAL_LINKS = {
   YOUTUBE: "https://youtube.com/@itachiwa_01?si=xL-3vNdye1dFF-v7",
-  TELEGRAM: "https://t.me/+JzOTfYqCwAU4MzE1",
+  TELEGRAM_GROUP: "https://t.me/+JzOTfYqCwAU4MzE1",
+  TELEGRAM_ADMIN: "https://t.me/VanhTRUM",
+  ZALO_ADMIN: "https://zalo.me/0337117930",
   FANPAGE: "beacons.ai/vanhtrumvn"
 };
 

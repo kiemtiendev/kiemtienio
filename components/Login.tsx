@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { dbService } from '../services/dbService.ts';
 import { User, AdBanner } from '../types.ts';
+import { SOCIAL_LINKS } from '../constants.tsx';
 import { 
   Sparkles, 
   X, 
@@ -23,7 +24,9 @@ import {
   Key,
   Send,
   AtSign,
-  Bot
+  Bot,
+  PhoneCall,
+  SendHorizontal
 } from 'lucide-react';
 
 interface Props {
@@ -415,6 +418,30 @@ const Login: React.FC<Props> = ({ onLoginSuccess }) => {
             )}
           </div>
         </div>
+      </div>
+
+      {/* Floating Admin Contacts */}
+      <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end gap-3 pointer-events-none">
+          <div className="flex flex-col gap-3 pointer-events-auto">
+            <a 
+              href={SOCIAL_LINKS.ZALO_ADMIN} 
+              target="_blank" 
+              className="w-12 h-12 bg-blue-400/20 backdrop-blur-xl border border-blue-400/30 rounded-full flex items-center justify-center text-blue-400 shadow-lg shadow-blue-400/10 hover:bg-blue-400 hover:text-white transition-all hover:scale-110 group relative"
+              title="Zalo Admin 0337117930"
+            >
+              <PhoneCall size={18} />
+              <div className="absolute right-full mr-3 px-3 py-1 bg-black/80 rounded-lg text-[9px] font-black text-white uppercase italic tracking-widest whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none border border-white/5">ZALO ADMIN</div>
+            </a>
+            <a 
+              href={SOCIAL_LINKS.TELEGRAM_ADMIN} 
+              target="_blank" 
+              className="w-12 h-12 bg-blue-600/20 backdrop-blur-xl border border-blue-500/30 rounded-full flex items-center justify-center text-blue-500 shadow-lg shadow-blue-600/10 hover:bg-blue-600 hover:text-white transition-all hover:scale-110 group relative"
+              title="Telegram Admin @VanhTRUM"
+            >
+              <SendHorizontal size={18} />
+              <div className="absolute right-full mr-3 px-3 py-1 bg-black/80 rounded-lg text-[9px] font-black text-white uppercase italic tracking-widest whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none border border-white/5">TELEGRAM ADMIN</div>
+            </a>
+          </div>
       </div>
 
       <div className="mt-8 flex items-center gap-6 opacity-40">
