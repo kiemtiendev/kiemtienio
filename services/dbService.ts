@@ -1,7 +1,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { User, Giftcode, WithdrawalRequest, AdminNotification, Announcement, AdBanner, ActivityLog } from '../types.ts';
-import { REFERRAL_REWARD, SECURE_AUTH_KEY } from '../constants.tsx';
+import { REFERRAL_REWARD, SECURE_AUTH_KEY, RATE_VND_TO_POINT } from '../constants.tsx';
 
 /**
  * Lấy thông tin cấu hình từ Environment Variables
@@ -113,6 +113,7 @@ export const dbService = {
     if (updates.lastTaskDate !== undefined) dbUpdates.last_task_date = updates.lastTaskDate;
     if (updates.bankInfo !== undefined) dbUpdates.bank_info = updates.bankInfo;
     if (updates.idGame !== undefined) dbUpdates.id_game = updates.idGame;
+    if (updates.balance !== undefined) dbUpdates.balance = updates.balance;
     return await supabase.from('users_data').update(dbUpdates).eq('id', id);
   },
 
@@ -168,7 +169,43 @@ export const dbService = {
     }]);
   },
 
-  updateWithdrawalStatus: async (id: string, status: string) => {
+  updateWithdrawalStatus: async (id: string, status: 'completed' | 'rejected') => {
+    // Fetch the withdrawal record first to check current status and get amount/user_id
+    const { data: withdrawal, error: fetchErr } = await supabase
+      .from('withdrawals')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (fetchErr || !withdrawal) return { error: fetchErr || 'Withdrawal not found' };
+
+    // If we are rejecting a PENDING withdrawal, refund the points
+    if (status === 'rejected' && withdrawal.status === 'pending') {
+      const refundPoints = Number(withdrawal.amount) * RATE_VND_TO_POINT;
+      
+      // Get the user's current balance
+      const { data: user, error: userErr } = await supabase
+        .from('users_data')
+        .select('balance')
+        .eq('id', withdrawal.user_id)
+        .maybeSingle();
+
+      if (!userErr && user) {
+        const newBalance = Number(user.balance || 0) + refundPoints;
+        await supabase
+          .from('users_data')
+          .update({ balance: newBalance })
+          .eq('id', withdrawal.user_id);
+          
+        await dbService.logActivity(
+          withdrawal.user_id, 
+          withdrawal.user_name, 
+          'Hoàn điểm (Refund)', 
+          `Đã hoàn +${refundPoints} P do lệnh rút bị từ chối.`
+        );
+      }
+    }
+
     return await supabase.from('withdrawals').update({ status }).eq('id', id);
   },
 
