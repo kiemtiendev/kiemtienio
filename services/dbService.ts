@@ -57,9 +57,7 @@ export const dbService = {
     const expectedTotal = pointsFromTasks + pointsFromGiftcodes + pointsFromRefs;
     const actualTotal = Number(u.balance || 0) + totalWithdrawnPoints;
 
-    // PHÁT HIỆN NGHI VẤN GIAN LẬN (Thực tế > Hợp lệ)
     if (actualTotal > expectedTotal + 1000) {
-      // TRỪ MẠNH ĐIỂM TIN CẬY KHI CÓ NGHI VẤN
       const currentScore = Number(u.security_score || 100);
       const newScore = Math.max(0, currentScore - 30);
       await supabase.from('users_data').update({ security_score: newScore }).eq('id', userId);
@@ -75,7 +73,6 @@ export const dbService = {
   },
 
   autoBanUser: async (userId: string, reason: string) => {
-    // KHI BỊ BAN THÌ ĐIỂM TIN CẬY VỀ 0 TUYỆT ĐỐI
     await supabase.from('users_data').update({ 
       is_banned: true, 
       ban_reason: `SENTINEL_AUTO: ${reason}`,
@@ -142,6 +139,15 @@ export const dbService = {
 
   logout: () => localStorage.removeItem('nova_session_id'),
 
+  deleteAccount: async (userId: string) => {
+    const { error } = await supabase.from('users_data').delete().eq('id', userId);
+    if (!error) {
+      localStorage.removeItem('nova_session_id');
+      return { success: true };
+    }
+    return { success: false, message: error.message };
+  },
+
   updateUser: async (id: string, updates: any) => {
     const dbUpdates: any = {};
     if (updates.isBanned !== undefined) dbUpdates.is_banned = updates.isBanned;
@@ -152,14 +158,14 @@ export const dbService = {
     if (updates.lastTaskDate !== undefined) dbUpdates.last_task_date = updates.lastTaskDate;
     if (updates.bankInfo !== undefined) dbUpdates.bank_info = updates.bankInfo;
     if (updates.idGame !== undefined) dbUpdates.id_game = updates.id_game;
-    if (updates.balance !== undefined) dbUpdates.balance = updates.balance;
+    if (updates.balance !== undefined) dbUpdates.balance = Number(updates.balance);
     if (updates.avatarUrl !== undefined) dbUpdates.avatar_url = updates.avatarUrl;
     
-    if (updates.totalEarned !== undefined) dbUpdates.total_earned = updates.totalEarned;
-    if (updates.totalGiftcodeEarned !== undefined) dbUpdates.total_giftcode_earned = updates.totalGiftcodeEarned;
-    if (updates.referralCount !== undefined) dbUpdates.referral_count = updates.referralCount;
-    if (updates.referralBonus !== undefined) dbUpdates.referral_bonus = updates.referralBonus;
-    if (updates.securityScore !== undefined) dbUpdates.security_score = updates.securityScore;
+    if (updates.totalEarned !== undefined) dbUpdates.total_earned = Number(updates.totalEarned);
+    if (updates.totalGiftcodeEarned !== undefined) dbUpdates.total_giftcode_earned = Number(updates.totalGiftcodeEarned);
+    if (updates.referralCount !== undefined) dbUpdates.referral_count = Number(updates.referralCount);
+    if (updates.referralBonus !== undefined) dbUpdates.referral_bonus = Number(updates.referralBonus);
+    if (updates.securityScore !== undefined) dbUpdates.security_score = Number(updates.securityScore);
 
     return await supabase.from('users_data').update(dbUpdates).eq('id', id);
   },
@@ -170,7 +176,6 @@ export const dbService = {
       return { error: 'SENTINEL_SECURITY_VIOLATION' };
     }
 
-    // TRỪ ĐIỂM TIN CẬY NẾU LÀM QUÁ NHANH (Nghi vấn dùng tool)
     if (timeElapsed < 25) {
        const { data: user } = await supabase.from('users_data').select('security_score').eq('id', id).maybeSingle();
        if (user) {
@@ -211,6 +216,7 @@ export const dbService = {
       if (usedBy.includes(userId)) return { success: false, message: 'Bạn đã sử dụng mã này rồi.' };
       if (usedBy.length >= gc.max_uses) return { success: false, message: 'Mã đã hết lượt nhập.' };
 
+      // NOVA FIX: Đảm bảo used_by được ghi nhận đúng cách
       const newUsedBy = [...usedBy, userId];
       const { error: updGcErr } = await supabase.from('giftcodes').update({ used_by: newUsedBy }).eq('code', gc.code);
       if (updGcErr) throw updGcErr;
@@ -264,7 +270,6 @@ export const dbService = {
       return { error: 'INSUFFICIENT_BALANCE' };
     }
 
-    // NOVA FIX: Trừ tiền trước khi tạo lệnh
     const { error: deductError } = await supabase.from('users_data')
       .update({ balance: Number(user.balance) - pointsNeeded })
       .eq('id', req.userId);
@@ -281,12 +286,12 @@ export const dbService = {
     }]).select().single();
 
     if (!error && inserted) {
-      // NOVA FIX: Ép kiểu Number cho inserted.amount để toLocaleString hiển thị đúng số tiền
       const displayAmount = Number(inserted.amount).toLocaleString();
       
       await dbService.addNotification({
         type: 'withdrawal',
         title: 'YÊU CẦU RÚT TIỀN MỚI',
+        // NOVA FIX: Hiển thị đúng định dạng tiền tệ trong thông báo Admin
         content: `ID: #${inserted.id} - ${req.userName} rút ${displayAmount}đ. ĐIỂM TIN CẬY: ${user.security_score}%`,
         userId: 'all',
         userName: req.userName

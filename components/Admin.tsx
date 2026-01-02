@@ -32,12 +32,10 @@ export default function Admin({ user, onUpdateUser }: Props) {
   const [sqlCopied, setSqlCopied] = useState(false);
   const [showAddModal, setShowAddModal] = useState<string | null>(null);
 
-  // States cho form thêm mới
   const [newAd, setNewAd] = useState({ title: '', imageUrl: '', targetUrl: '' });
   const [newAnn, setNewAnn] = useState({ title: '', content: '', priority: 'low' as 'low' | 'high' });
   const [newGc, setNewGc] = useState({ code: '', amount: 10000, maxUses: 100 });
   
-  // State cho chỉnh sửa số dư
   const [editBalanceUser, setEditBalanceUser] = useState<User | null>(null);
   const [balanceAdjustAmount, setBalanceAdjustAmount] = useState<number>(0);
 
@@ -81,7 +79,7 @@ export default function Admin({ user, onUpdateUser }: Props) {
     return withdrawals.filter(w => 
       w.userName?.toLowerCase().includes(withdrawSearchTerm.toLowerCase()) ||
       w.details?.toLowerCase().includes(withdrawSearchTerm.toLowerCase()) ||
-      w.id?.toLowerCase().includes(withdrawSearchTerm.toLowerCase())
+      w.id?.toString().includes(withdrawSearchTerm.toLowerCase())
     );
   }, [withdrawals, withdrawSearchTerm]);
 
@@ -93,7 +91,6 @@ export default function Admin({ user, onUpdateUser }: Props) {
     };
   }, [allUsers, withdrawals]);
 
-  // Handlers
   const handleToggleBan = async (u: User) => {
     const reason = u.isBanned ? '' : 'Vi phạm quy định hệ thống';
     if (!window.confirm(u.isBanned ? `Mở khóa tài khoản ${u.fullname}?` : `Khóa tài khoản ${u.fullname}?`)) return;
@@ -103,17 +100,12 @@ export default function Admin({ user, onUpdateUser }: Props) {
 
   const handleAdjustBalance = async (isDeduct: boolean) => {
     if (!editBalanceUser || balanceAdjustAmount <= 0) return;
-    
     const amount = isDeduct ? -balanceAdjustAmount : balanceAdjustAmount;
     const newBalance = (Number(editBalanceUser.balance) || 0) + amount;
-    
     if (newBalance < 0) return alert("Số dư không thể âm!");
-
     if (!window.confirm(`${isDeduct ? 'Trừ' : 'Cộng'} ${balanceAdjustAmount.toLocaleString()} P cho ${editBalanceUser.fullname}?`)) return;
-
     await dbService.updateUser(editBalanceUser.id, { balance: newBalance });
     await dbService.logActivity(user.id, user.fullname, 'ADJUST_BALANCE', `${isDeduct ? 'Trừ' : 'Cộng'} ${balanceAdjustAmount} P của ${editBalanceUser.fullname} (#${editBalanceUser.id})`);
-    
     setEditBalanceUser(null);
     setBalanceAdjustAmount(0);
     refreshData();
@@ -170,7 +162,6 @@ ALTER TABLE public.users_data ADD COLUMN IF NOT EXISTS last_task_date TIMESTAMP 
     setTimeout(() => setSqlCopied(false), 2000);
   };
 
-  // Helper function to get color for security score
   const getSecurityColor = (score: number) => {
     if (score >= 80) return 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
     if (score >= 50) return 'bg-amber-500/10 text-amber-500 border-amber-500/20';
@@ -179,7 +170,6 @@ ALTER TABLE public.users_data ADD COLUMN IF NOT EXISTS last_task_date TIMESTAMP 
 
   return (
     <div className="space-y-8 animate-in fade-in pb-24">
-      {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-slate-900/40 p-8 rounded-[2.5rem] border border-white/5">
         <div className="flex items-center gap-5">
           <div className="p-4 bg-blue-600 rounded-2xl shadow-xl shadow-blue-600/30">
@@ -200,7 +190,6 @@ ALTER TABLE public.users_data ADD COLUMN IF NOT EXISTS last_task_date TIMESTAMP 
         </button>
       </div>
 
-      {/* Stats Summary */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="glass-card p-8 rounded-[2.5rem] border border-blue-500/10 flex items-center justify-between">
            <div><span className="text-[10px] font-black text-slate-500 uppercase block mb-1">Hội viên</span><h2 className="text-3xl font-black text-white italic">{stats.totalUsers}</h2></div>
@@ -216,7 +205,6 @@ ALTER TABLE public.users_data ADD COLUMN IF NOT EXISTS last_task_date TIMESTAMP 
         </div>
       </div>
 
-      {/* Navigation Tabs */}
       <div className="flex flex-wrap gap-4 p-2 overflow-x-auto no-scrollbar justify-start md:justify-center">
         {[
           { id: 'users', label: 'HỘI VIÊN', icon: <Users size={18} /> },
@@ -237,10 +225,7 @@ ALTER TABLE public.users_data ADD COLUMN IF NOT EXISTS last_task_date TIMESTAMP 
         ))}
       </div>
 
-      {/* Content Area */}
       <div className="glass-card p-10 rounded-[3.5rem] border border-white/5 bg-slate-950/40 relative min-h-[500px]">
-        
-        {/* Tab Hội Viên */}
         {tab === 'users' && (
            <div className="space-y-8 animate-in slide-in-from-right-4">
               <div className="relative w-full max-w-md">
@@ -282,7 +267,6 @@ ALTER TABLE public.users_data ADD COLUMN IF NOT EXISTS last_task_date TIMESTAMP 
            </div>
         )}
 
-        {/* Tab Rút Tiền */}
         {tab === 'withdrawals' && (
            <div className="space-y-6">
               <div className="relative w-full max-w-md mb-4">
@@ -290,7 +274,7 @@ ALTER TABLE public.users_data ADD COLUMN IF NOT EXISTS last_task_date TIMESTAMP 
                  <input type="text" value={withdrawSearchTerm} onChange={e => setWithdrawSearchTerm(e.target.value)} placeholder="Tìm lệnh rút..." className="w-full bg-slate-900 border border-white/5 rounded-2xl pl-16 pr-6 py-5 text-white font-bold outline-none focus:border-amber-500" />
               </div>
              {filteredWithdrawals.map(w => (
-               <div key={w.id} className="glass-card p-8 rounded-[2.5rem] border border-white/5 bg-slate-900/40 flex flex-col md:flex-row items-center justify-between gap-8">
+               <div key={w.id} className="glass-card p-8 rounded-[2.5rem] border border-white/5 bg-slate-900/40 flex flex-col md:flex-row items-center justify-between gap-8 animate-in slide-in-from-right-4">
                   <div className="flex gap-6 items-center flex-1">
                      <div className={`p-5 rounded-2xl ${w.type === 'bank' ? 'bg-emerald-600/10 text-emerald-400' : 'bg-purple-600/10 text-purple-400'}`}>{w.type === 'bank' ? <Building2 size={28} /> : <Gamepad2 size={28} />}</div>
                      <div>
@@ -300,8 +284,12 @@ ALTER TABLE public.users_data ADD COLUMN IF NOT EXISTS last_task_date TIMESTAMP 
                              <Shield size={10} /> ĐIỂM TIN CẬY: {w.securityScore}%
                           </span>
                         </div>
-                        <h4 className="font-black text-2xl text-white italic">{w.amount.toLocaleString()}đ</h4>
-                        <div className="text-[10px] text-slate-400 italic mt-2 bg-white/5 px-3 py-1 rounded-lg inline-block">Info: {w.details}</div>
+                        <h4 className="font-black text-2xl text-white italic">{Number(w.amount).toLocaleString()}đ</h4>
+                        <div className="flex flex-col gap-1 mt-2">
+                           <div className="text-[10px] text-slate-400 italic bg-white/5 px-3 py-1 rounded-lg inline-block w-fit">Info: {w.details}</div>
+                           {/* NOVA UPDATE: Hiển thị ID rút tiền ngay dưới thông tin bank/game */}
+                           <div className="text-[10px] text-blue-400 font-black uppercase italic bg-blue-400/10 px-3 py-1 rounded-lg inline-block w-fit border border-blue-400/20">Nội dung CK: #{w.id}</div>
+                        </div>
                      </div>
                   </div>
                   {w.status === 'pending' && (
@@ -318,7 +306,6 @@ ALTER TABLE public.users_data ADD COLUMN IF NOT EXISTS last_task_date TIMESTAMP 
            </div>
         )}
 
-        {/* Tab Quảng Cáo */}
         {tab === 'ads' && (
           <div className="space-y-8">
             <div className="flex justify-between items-center">
@@ -345,7 +332,6 @@ ALTER TABLE public.users_data ADD COLUMN IF NOT EXISTS last_task_date TIMESTAMP 
           </div>
         )}
 
-        {/* Tab Thông Báo */}
         {tab === 'announcements' && (
           <div className="space-y-8">
             <div className="flex justify-between items-center">
@@ -372,7 +358,6 @@ ALTER TABLE public.users_data ADD COLUMN IF NOT EXISTS last_task_date TIMESTAMP 
           </div>
         )}
 
-        {/* Tab Giftcode */}
         {tab === 'giftcodes' && (
           <div className="space-y-8">
             <div className="flex justify-between items-center">
@@ -397,7 +382,6 @@ ALTER TABLE public.users_data ADD COLUMN IF NOT EXISTS last_task_date TIMESTAMP 
           </div>
         )}
 
-        {/* Tab Nhật Ký */}
         {tab === 'logs' && (
            <div className="space-y-4 animate-in slide-in-from-right-4">
               <h3 className="text-xl font-black text-white italic uppercase mb-6 flex items-center gap-4"><History className="text-blue-500" /> Hệ thống log</h3>
@@ -413,7 +397,6 @@ ALTER TABLE public.users_data ADD COLUMN IF NOT EXISTS last_task_date TIMESTAMP 
            </div>
         )}
 
-        {/* Tab Database (Setup) */}
         {tab === 'setup' && (
            <div className="space-y-8">
               <div className="p-10 rounded-[3rem] border border-amber-500/20 bg-amber-500/5 space-y-6">
@@ -428,7 +411,6 @@ ALTER TABLE public.users_data ADD COLUMN IF NOT EXISTS last_task_date TIMESTAMP 
         )}
       </div>
 
-      {/* Modal chỉnh sửa số dư */}
       {editBalanceUser && (
         <div className="fixed inset-0 z-[250] flex items-center justify-center p-6 animate-in fade-in">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setEditBalanceUser(null)}></div>
@@ -438,7 +420,6 @@ ALTER TABLE public.users_data ADD COLUMN IF NOT EXISTS last_task_date TIMESTAMP 
               <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{editBalanceUser.fullname} (#{editBalanceUser.id})</p>
               <p className="text-sm font-black text-emerald-500 mt-2 italic">Hiện tại: {Number(editBalanceUser.balance).toLocaleString()} P</p>
             </div>
-            
             <div className="space-y-4">
               <div className="relative group">
                  <input 
@@ -449,7 +430,6 @@ ALTER TABLE public.users_data ADD COLUMN IF NOT EXISTS last_task_date TIMESTAMP 
                   className="w-full bg-slate-900 border border-slate-800 rounded-2xl p-5 text-white font-black text-center outline-none focus:border-blue-500"
                  />
               </div>
-              
               <div className="flex gap-4">
                 <button onClick={() => handleAdjustBalance(false)} className="flex-1 py-4 bg-emerald-600 text-white font-black rounded-2xl italic uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20">
                   <PlusCircle size={16} /> CỘNG ĐIỂM
@@ -459,13 +439,11 @@ ALTER TABLE public.users_data ADD COLUMN IF NOT EXISTS last_task_date TIMESTAMP 
                 </button>
               </div>
             </div>
-            
             <button onClick={() => setEditBalanceUser(null)} className="w-full text-slate-600 font-black uppercase text-[10px] italic">HỦY BỎ</button>
           </div>
         </div>
       )}
 
-      {/* Modals cho việc thêm mới */}
       {showAddModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 animate-in fade-in">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setShowAddModal(null)}></div>
@@ -501,7 +479,6 @@ ALTER TABLE public.users_data ADD COLUMN IF NOT EXISTS last_task_date TIMESTAMP 
                 <button onClick={handleCreateGc} className="w-full py-5 bg-blue-600 text-white font-black rounded-2xl italic uppercase tracking-widest">TẠO MÃ NGAY</button>
               </div>
             )}
-            
             <button onClick={() => setShowAddModal(null)} className="w-full text-slate-500 font-black uppercase text-[10px] italic">HỦY BỎ</button>
           </div>
         </div>

@@ -23,8 +23,10 @@ import {
   Camera,
   X,
   RotateCcw,
-  Aperture
+  Aperture,
+  UserX
 } from 'lucide-react';
+import { dbService } from '../services/dbService.ts';
 
 interface Props {
   user: User;
@@ -36,7 +38,6 @@ const Profile: React.FC<Props> = ({ user, onUpdateUser }) => {
   const [gameId, setGameId] = useState(user.idGame);
   const [saved, setSaved] = useState(false);
   
-  // Camera States
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isCameraLoading, setIsCameraLoading] = useState(false);
@@ -48,6 +49,17 @@ const Profile: React.FC<Props> = ({ user, onUpdateUser }) => {
     onUpdateUser({ ...user, bankInfo: bank, idGame: gameId });
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
+  };
+
+  const handleDeleteAccount = async () => {
+    if (window.confirm("BẠN CÓ CHẮC CHẮN MUỐN XÓA TÀI KHOẢN? Hành động này không thể hoàn tác và toàn bộ số dư của bạn sẽ bị mất.")) {
+      const res = await dbService.deleteAccount(user.id);
+      if (res.success) {
+        window.location.reload();
+      } else {
+        alert("Lỗi khi xóa tài khoản: " + res.message);
+      }
+    }
   };
 
   const score = user.securityScore ?? 100;
@@ -81,7 +93,6 @@ const Profile: React.FC<Props> = ({ user, onUpdateUser }) => {
 
   const security = getSecurityStatus();
 
-  // Camera Logic
   const openCamera = async () => {
     setIsCameraOpen(true);
     setIsCameraLoading(true);
@@ -120,8 +131,6 @@ const Profile: React.FC<Props> = ({ user, onUpdateUser }) => {
         context.drawImage(videoRef.current, 0, 0, 500, 500);
         const dataUrl = canvasRef.current.toDataURL('image/jpeg', 0.8);
         setCapturedImage(dataUrl);
-        
-        // Stop camera
         const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
         tracks.forEach(track => track.stop());
       }
@@ -163,7 +172,6 @@ const Profile: React.FC<Props> = ({ user, onUpdateUser }) => {
           </div>
         </div>
 
-        {/* Sentinel Score Mini Card */}
         <div className={`glass-card px-6 py-4 rounded-2xl border ${security.border} ${security.bg} flex items-center gap-4`}>
           <div className={`${security.color} animate-pulse`}>
             {security.icon}
@@ -219,9 +227,7 @@ const Profile: React.FC<Props> = ({ user, onUpdateUser }) => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
-          
-          {/* Sentinel Detailed Status Card */}
-          <div className={`glass-card p-8 md:p-10 rounded-[3rem] border-2 ${security.border} relative overflow-hidden`}>
+          <div className={`glass-card p-8 md:p-10 rounded-[3rem] border-2 ${security.border} relative overflow-hidden animate-in slide-in-from-left-4`}>
              <div className="absolute -top-10 -right-10 opacity-5 rotate-12">
                <Shield className="w-64 h-64 text-white" />
              </div>
@@ -248,11 +254,6 @@ const Profile: React.FC<Props> = ({ user, onUpdateUser }) => {
                    <p className="text-slate-400 text-xs font-medium italic leading-relaxed">
                      {security.desc} Hệ thống tự động phân tích hành vi nạp, rút và làm nhiệm vụ để bảo vệ cộng đồng Diamond Nova.
                    </p>
-                   <div className="flex flex-wrap gap-2 justify-center md:justify-start">
-                      <span className="px-3 py-1 bg-white/5 rounded-full text-[9px] font-black text-slate-500 border border-white/5 uppercase italic">IP Consistency: OK</span>
-                      <span className="px-3 py-1 bg-white/5 rounded-full text-[9px] font-black text-slate-500 border border-white/5 uppercase italic">Anti-Bot: Passed</span>
-                      <span className="px-3 py-1 bg-white/5 rounded-full text-[9px] font-black text-slate-500 border border-white/5 uppercase italic">Audit Sync: Verified</span>
-                   </div>
                 </div>
              </div>
           </div>
@@ -268,10 +269,12 @@ const Profile: React.FC<Props> = ({ user, onUpdateUser }) => {
                 <div className="space-y-3">
                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 italic">ID Game (Free Fire / LQ)</label>
                    <input type="text" value={gameId} onChange={(e) => setGameId(e.target.value)} placeholder="VD: 2029384756" className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-5 text-white font-bold outline-none focus:border-blue-600 transition-all shadow-inner" />
-                   <p className="text-[9px] text-slate-600 font-bold italic ml-2">Mẹo: Nhập chính xác ID để nhận KC tự động qua cổng nạp.</p>
                 </div>
-                <div className="flex justify-end">
-                   <button onClick={handleSave} className="bg-blue-600 hover:bg-blue-500 text-white font-black px-12 py-5 rounded-2xl shadow-xl shadow-blue-600/20 flex items-center gap-3 uppercase tracking-widest text-xs italic transition-all active:scale-95">
+                <div className="flex justify-end gap-4">
+                   <button onClick={handleDeleteAccount} className="px-6 py-5 rounded-2xl bg-red-600/10 text-red-500 font-black uppercase text-[10px] italic border border-red-500/20 hover:bg-red-600 hover:text-white transition-all">
+                      <UserX className="w-4 h-4" />
+                   </button>
+                   <button onClick={handleSave} className="flex-1 md:flex-none bg-blue-600 hover:bg-blue-500 text-white font-black px-12 py-5 rounded-2xl shadow-xl shadow-blue-600/20 flex items-center justify-center gap-3 uppercase tracking-widest text-xs italic transition-all active:scale-95">
                       {saved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
                       <span>{saved ? 'ĐÃ CẬP NHẬT' : 'LƯU THAY ĐỔI'}</span>
                    </button>
@@ -294,44 +297,21 @@ const Profile: React.FC<Props> = ({ user, onUpdateUser }) => {
                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                        <span className="text-[10px] font-black text-slate-300 uppercase italic">Thanh toán minh bạch</span>
                     </div>
-                    <div className="flex items-center gap-3">
-                       <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                       <span className="text-[10px] font-black text-slate-300 uppercase italic">Hỗ trợ 24/7 qua AI</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                       <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                       <span className="text-[10px] font-black text-slate-300 uppercase italic">Cộng đồng 10.000+ member</span>
-                    </div>
                  </div>
               </div>
-           </div>
-
-           {/* VIP Section - Simplified in right col */}
-           <div className="relative group overflow-hidden glass-card p-8 rounded-[3rem] border border-amber-500/20 bg-gradient-to-br from-amber-600/10 to-transparent">
-             <Crown className="w-12 h-12 text-amber-500 mb-6" />
-             <h3 className="text-xl font-black text-white italic uppercase tracking-tighter mb-4">NOVA VIP</h3>
-             <p className="text-slate-400 text-[10px] font-medium italic mb-6">Tăng tốc độ kiếm điểm và ưu tiên xử lý rút tiền 24/7.</p>
-             <button 
-                onClick={() => alert("Chương trình VIP đang được cập nhật menu mới. Vui lòng quay lại sau!")}
-                className="w-full py-4 bg-amber-500 text-slate-950 font-black rounded-xl uppercase italic tracking-widest text-[10px]"
-             >
-                XEM GÓI VIP
-             </button>
            </div>
         </div>
       </div>
 
-      {/* Camera Modal */}
       {isCameraOpen && (
         <div className="fixed inset-0 z-[250] flex items-center justify-center p-6 animate-in fade-in">
            <div className="absolute inset-0 bg-black/90 backdrop-blur-xl" onClick={closeCamera}></div>
-           <div className="glass-card w-full max-w-lg p-10 rounded-[3rem] border border-white/10 relative z-10 space-y-8 animate-in zoom-in-95">
+           <div className="glass-card w-full max-w-lg p-10 rounded-[3rem] border border-white/10 relative z-10 space-y-8">
               <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-black text-white italic uppercase">CHỤP ẢNH ĐẠI DIỆN</h2>
                 <button onClick={closeCamera} className="p-2 bg-white/5 rounded-xl text-slate-500 hover:text-white"><X size={20} /></button>
               </div>
-
-              <div className="relative aspect-square bg-black rounded-[2rem] overflow-hidden border border-white/5 shadow-2xl">
+              <div className="relative aspect-square bg-black rounded-[2rem] overflow-hidden">
                  {!capturedImage ? (
                    <>
                      <video ref={videoRef} className="w-full h-full object-cover scale-x-[-1]" />
@@ -341,48 +321,26 @@ const Profile: React.FC<Props> = ({ user, onUpdateUser }) => {
                          <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest italic">Đang khởi tạo Camera...</span>
                        </div>
                      )}
-                     <div className="absolute inset-0 pointer-events-none border-[30px] border-black/20 rounded-[2rem]"></div>
-                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 border border-white/10 rounded-full"></div>
                    </>
                  ) : (
                    <img src={capturedImage} alt="Captured" className="w-full h-full object-cover scale-x-[-1]" />
                  )}
               </div>
-
               <div className="flex flex-col gap-4">
                  {!capturedImage ? (
-                   <button 
-                    onClick={capturePhoto} 
-                    className="w-full py-6 bg-white text-black font-black rounded-2xl italic uppercase tracking-widest flex items-center justify-center gap-3 shadow-xl active:scale-95"
-                   >
-                     <Aperture size={24} />
-                     CHỤP ẢNH NGAY
+                   <button onClick={capturePhoto} className="w-full py-6 bg-white text-black font-black rounded-2xl italic uppercase tracking-widest flex items-center justify-center gap-3 shadow-xl">
+                     <Aperture size={24} /> CHỤP ẢNH NGAY
                    </button>
                  ) : (
                    <div className="flex gap-4">
-                      <button 
-                        onClick={() => { setCapturedImage(null); openCamera(); }} 
-                        className="flex-1 py-5 bg-slate-900 border border-white/5 text-slate-400 font-black rounded-2xl italic uppercase text-xs flex items-center justify-center gap-2"
-                      >
-                        <RotateCcw size={18} /> CHỤP LẠI
-                      </button>
-                      <button 
-                        onClick={updateAvatar} 
-                        className="flex-1 py-5 bg-blue-600 text-white font-black rounded-2xl italic uppercase text-xs flex items-center justify-center gap-2 shadow-xl shadow-blue-600/20"
-                      >
-                        <CheckCircle2 size={18} /> CẬP NHẬT ẢNH
-                      </button>
+                      <button onClick={() => { setCapturedImage(null); openCamera(); }} className="flex-1 py-5 bg-slate-900 border border-white/5 text-slate-400 font-black rounded-2xl italic uppercase text-xs flex items-center justify-center gap-2"><RotateCcw size={18} /> CHỤP LẠI</button>
+                      <button onClick={updateAvatar} className="flex-1 py-5 bg-blue-600 text-white font-black rounded-2xl italic uppercase text-xs flex items-center justify-center gap-2"><CheckCircle2 size={18} /> CẬP NHẬT ẢNH</button>
                    </div>
                  )}
               </div>
-              
-              <p className="text-[9px] text-slate-600 text-center font-bold italic uppercase tracking-widest">
-                Nova Cloud Sync • Camera Verified
-              </p>
            </div>
         </div>
       )}
-      
       <canvas ref={canvasRef} style={{ display: 'none' }} />
     </div>
   );
