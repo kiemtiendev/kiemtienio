@@ -128,7 +128,6 @@ export const dbService = {
   },
 
   getCurrentUser: async () => {
-    // FIX: Changed sessionStorage.setItem to sessionStorage.getItem to correctly retrieve the session ID.
     const id = localStorage.getItem('nova_session_id') || sessionStorage.getItem('nova_session_id');
     if (!id) return null;
     const { data, error } = await supabase.from('users_data').select('*').eq('id', id).maybeSingle();
@@ -166,6 +165,7 @@ export const dbService = {
     
     // Map camelCase to snake_case for DB
     if (updates.bankInfo !== undefined) dbUpdates.bank_info = updates.bankInfo;
+    // Fix: updates is Partial<User>, so it uses idGame instead of id_game
     if (updates.idGame !== undefined) dbUpdates.id_game = updates.idGame;
     if (updates.phoneNumber !== undefined) dbUpdates.phone_number = updates.phoneNumber;
     if (updates.avatarUrl !== undefined) dbUpdates.avatar_url = updates.avatarUrl;
@@ -233,13 +233,45 @@ export const dbService = {
     return { success: true, message: 'Cập nhật số dư thành công.' };
   },
 
+  // Fix: Implement missing addPointsSecurely for task verification
+  addPointsSecurely: async (userId: string, timeElapsed: number, points: number, gateName: string) => {
+    // Basic anti-cheat: if task is done too fast (e.g. < 5s)
+    if (timeElapsed < 5) {
+      return { error: 'SENTINEL_SECURITY_VIOLATION' };
+    }
+
+    const { data: u, error: fetchError } = await supabase
+      .from('users_data')
+      .select('balance, total_earned, tasks_today, tasks_week, task_counts')
+      .eq('id', userId)
+      .single();
+
+    if (fetchError || !u) return { error: 'Không tìm thấy hội viên.' };
+
+    const taskCounts = u.task_counts || {};
+    taskCounts[gateName] = (taskCounts[gateName] || 0) + 1;
+
+    const { error: updateError } = await supabase
+      .from('users_data')
+      .update({
+        balance: Number(u.balance || 0) + points,
+        total_earned: Number(u.total_earned || 0) + points,
+        tasks_today: Number(u.tasks_today || 0) + 1,
+        tasks_week: Number(u.tasks_week || 0) + 1,
+        task_counts: taskCounts,
+        last_task_date: new Date().toISOString()
+      })
+      .eq('id', userId);
+
+    if (updateError) return { error: updateError.message };
+    return { success: true };
+  },
+
   deleteUser: async (userId: string) => {
-    // Note: If there are foreign keys (e.g. withdrawals), the delete might fail 
-    // depending on ON DELETE CASCADE settings in DB.
     const { error } = await supabase.from('users_data').delete().eq('id', userId);
     if (error) {
       console.error("Supabase Delete Error:", error);
-      return { success: false, message: `Không thể xóa: ${error.message}. (Có thể do hội viên đang có dữ liệu giao dịch liên quan)` };
+      return { success: false, message: `Không thể xóa: ${error.message}.` };
     }
     return { success: true, message: 'Đã xóa hội viên vĩnh viễn.' };
   },
@@ -362,7 +394,7 @@ export const dbService = {
     const { error } = await supabase.from('giftcodes').insert([{
       code: gc.code,
       amount: gc.amount,
-      max_uses: gc.max_uses,
+      max_uses: Number(gc.max_uses) || 100, // Đảm bảo không bằng 0 mặc định
       used_by: [],
       created_at: new Date().toISOString(),
       is_active: true
@@ -383,35 +415,57 @@ export const dbService = {
     
     const gc = mapGiftcode(gcRaw);
     if (gc.usedBy.includes(userId)) return { success: false, message: 'Bạn đã sử dụng mã này rồi.' };
-    if (gc.usedBy.length >= gc.maxUses) return { success: false, message: 'Mã đã đạt giới hạn lượt sử dụng.' };
+    
+    // FIX: Sửa logic kiểm tra maxUses. Nếu admin vô tình để 0 hoặc mã đã hết lượt.
+    if (gc.maxUses > 0 && gc.usedBy.length >= gc.maxUses) {
+      return { success: false, message: 'Mã đã đạt giới hạn lượt sử dụng.' };
+    }
+    
+    if (gc.maxUses <= 0 && gc.usedBy.length > 0) { // Trường hợp maxUses là 0 nhưng đã có người dùng
+       return { success: false, message: 'Mã quà tặng này đã hết lượt sử dụng (Max: 0).' };
+    }
 
-    // 2. Tìm người dùng với ID chính xác
+    // 2. Tìm người dùng
     const { data: u, error: userError } = await supabase
       .from('users_data')
       .select('id, balance, total_giftcode_earned')
       .eq('id', userId.trim())
       .single();
 
-    if (userError || !u) {
-      console.error("User validation failed in claimGiftcode:", userError);
-      return { success: false, message: 'Lỗi xác thực người dùng. Hãy đăng nhập lại.' };
-    }
+    if (userError || !u) return { success: false, message: 'Lỗi xác thực người dùng.' };
 
-    // 3. Cập nhật số dư người dùng
+    // 3. Cập nhật
     const { error: updateError } = await supabase.from('users_data').update({ 
       balance: Number(u.balance) + Number(gc.amount),
       total_giftcode_earned: (Number(u.total_giftcode_earned) || 0) + Number(gc.amount)
     }).eq('id', u.id);
     
-    if (updateError) {
-      console.error("Update balance error:", updateError);
-      return { success: false, message: 'Không thể cập nhật số dư. Thử lại sau.' };
-    }
+    if (updateError) return { success: false, message: 'Lỗi cập nhật số dư.' };
 
-    // 4. Đánh dấu mã đã sử dụng
     await supabase.from('giftcodes').update({ used_by: [...gc.usedBy, userId] }).eq('code', gc.code);
+    return { success: true, amount: gc.amount, message: `Thành công! Nhận ${gc.amount.toLocaleString()} P.` };
+  },
+
+  getVipLeaderboard: async () => {
+    // Lấy tất cả yêu cầu VIP đã hoàn thành
+    const { data, error } = await supabase
+      .from('vip_requests')
+      .select('user_name, amount_vnd')
+      .eq('status', 'completed');
     
-    return { success: true, amount: gc.amount, message: `Thành công! Bạn nhận được ${gc.amount.toLocaleString()} P.` };
+    if (error || !data) return [];
+    
+    // Gom nhóm theo user_name và tính tổng
+    const map = new Map();
+    data.forEach(item => {
+      const current = map.get(item.user_name) || 0;
+      map.set(item.user_name, current + Number(item.amount_vnd));
+    });
+    
+    return Array.from(map.entries())
+      .map(([name, total]) => ({ name, total }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 10);
   },
 
   getNotifications: async (userId: string) => {
@@ -460,46 +514,46 @@ export const dbService = {
         userId: 'all',
         userName: req.userName,
         title: 'YÊU CẦU NÂNG CẤP VIP MỚI',
-        content: `Hội viên ${req.userName} đã chuyển khoản nâng cấp lên ${req.vipTier.toUpperCase()}. Vui lòng kiểm tra bill.`,
+        content: `Hội viên ${req.userName} đã gửi yêu cầu nâng cấp VIP.`,
         type: 'system'
       });
     }
 
-    return { success: !error, message: error ? error.message : 'Gửi yêu cầu thành công, vui lòng chờ duyệt.' };
+    return { success: !error, message: error ? error.message : 'Gửi yêu cầu thành công.' };
   },
 
   upgradeVipTiered: async (userId: string, amountVnd: number) => {
-    const { data: u } = await supabase.from('users_data').select('balance, fullname').eq('id', userId).single();
+    const { data: u } = await supabase.from('users_data').select('balance, fullname, vip_until').eq('id', userId).single();
     const pointsNeeded = amountVnd * 10;
-    if (!u || u.balance < pointsNeeded) return { success: false, message: 'Không đủ điểm Nova (P).' };
+    if (!u || u.balance < pointsNeeded) return { success: false, message: 'Không đủ điểm Nova.' };
+    
     let days = 1;
     let tier = VipTier.BASIC;
     if (amountVnd >= 500000) { days = 30; tier = VipTier.ELITE; }
     else if (amountVnd >= 100000) { days = 7; tier = VipTier.PRO; }
+    
     const vipUntil = new Date();
     vipUntil.setDate(vipUntil.getDate() + days);
+    
     const { error } = await supabase.from('users_data').update({
       balance: Number(u.balance) - pointsNeeded,
       vip_tier: tier,
       vip_until: vipUntil.toISOString()
     }).eq('id', userId);
+    
+    if (!error) {
+      // Lưu vào lịch sử vip_requests để hiển thị
+      await supabase.from('vip_requests').insert([{
+        user_id: userId,
+        user_name: u.fullname,
+        vip_tier: tier,
+        amount_vnd: amountVnd,
+        status: 'completed',
+        created_at: new Date().toISOString()
+      }]);
+    }
+    
     return { success: !error, message: error ? error.message : `Đã kích hoạt ${tier.toUpperCase()} thành công!` };
-  },
-
-  addPointsSecurely: async (userId: string, timeElapsed: number, points: number, gateName: string) => {
-    if (timeElapsed < 10) return { error: 'SECURITY_VIOLATION' }; 
-    const { data: u } = await supabase.from('users_data').select('balance, total_earned, tasks_today, task_counts').eq('id', userId).single();
-    if (!u) return { error: 'User not found' };
-    const newCounts = { ...(u.task_counts || {}) };
-    newCounts[gateName] = (newCounts[gateName] || 0) + 1;
-    const { error } = await supabase.from('users_data').update({
-      balance: Number(u.balance) + points,
-      total_earned: Number(u.total_earned) + points,
-      tasks_today: Number(u.tasks_today) + 1,
-      last_task_date: new Date().toISOString(),
-      task_counts: newCounts
-    }).eq('id', userId);
-    return { success: !error, error: error?.message };
   },
 
   logout: () => {

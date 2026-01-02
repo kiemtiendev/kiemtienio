@@ -6,7 +6,8 @@ import { formatK, ADMIN_BANKS, SLOGAN } from '../constants.tsx';
 import { 
   Crown, Sparkles, Zap, ShieldCheck, CheckCircle2, Trophy, 
   ArrowRight, Loader2, Star, CreditCard, Wallet, Copy, 
-  CheckCircle, Image as ImageIcon, AlertTriangle, X, History, Clock
+  CheckCircle, Image as ImageIcon, AlertTriangle, X, History, Clock,
+  Medal
 } from 'lucide-react';
 
 interface Props {
@@ -17,6 +18,7 @@ interface Props {
 const Vip: React.FC<Props> = ({ user, onUpdateUser }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [vipHistory, setVipHistory] = useState<any[]>([]);
+  const [vipLeaderboard, setVipLeaderboard] = useState<any[]>([]);
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [selectedPkg, setSelectedPkg] = useState<any>(null);
   const [paymentMethod, setPaymentMethod] = useState<'points' | 'bank' | null>(null);
@@ -62,6 +64,7 @@ const Vip: React.FC<Props> = ({ user, onUpdateUser }) => {
 
   useEffect(() => {
     dbService.getVipRequests(user.id).then(setVipHistory);
+    dbService.getVipLeaderboard().then(setVipLeaderboard);
   }, [user.id]);
 
   const openDeposit = (pkg: any) => {
@@ -83,7 +86,7 @@ const Vip: React.FC<Props> = ({ user, onUpdateUser }) => {
 
   const handleBuyWithPoints = async () => {
     if (user.balance < selectedPkg.vnd * 10) return alert("Số dư Nova (P) không đủ.");
-    if (!confirm(`XÁC NHẬN: Nâng cấp gói ${selectedPkg.name}. \n\n⚠️ CẢNH BÁO: VIP không thể nâng cấp đè nhau. Nếu bạn đang có VIP, gói mới sẽ thay thế gói cũ. Bạn đồng ý?`)) return;
+    if (!confirm(`XÁC NHẬN: Nâng cấp gói ${selectedPkg.name}. VIP hiện tại của bạn sẽ bị thay thế.`)) return;
 
     setIsLoading(true);
     const res = await dbService.upgradeVipTiered(user.id, selectedPkg.vnd);
@@ -94,6 +97,7 @@ const Vip: React.FC<Props> = ({ user, onUpdateUser }) => {
       const updated = await dbService.getCurrentUser();
       if (updated) onUpdateUser(updated);
       setShowDepositModal(false);
+      dbService.getVipRequests(user.id).then(setVipHistory);
     } else alert(res.message);
   };
 
@@ -104,7 +108,7 @@ const Vip: React.FC<Props> = ({ user, onUpdateUser }) => {
       userName: user.fullname,
       email: user.email,
       vipTier: selectedPkg.tier,
-      amountVnd: selectedPkg.vnd,
+      amount_vnd: selectedPkg.vnd,
       bankDetails: `${randomBank.bank} - ${randomBank.account}`,
       transferContent: generateTransferContent(),
       billUrl: billFile || '',
@@ -118,7 +122,6 @@ const Vip: React.FC<Props> = ({ user, onUpdateUser }) => {
 
   const copyToClipboard = (txt: string) => {
     navigator.clipboard.writeText(txt);
-    alert("Đã sao chép nội dung!");
   };
 
   const getVipCrownColor = (tier: VipTier) => {
@@ -139,24 +142,55 @@ const Vip: React.FC<Props> = ({ user, onUpdateUser }) => {
         <p className="text-slate-400 mt-4 font-medium italic uppercase tracking-widest text-[10px]">{SLOGAN}</p>
       </div>
 
-      {/* Non-stackable Warning */}
-      <div className="p-6 bg-amber-500/10 border-2 border-amber-500/30 rounded-[2.5rem] flex items-start gap-4 shadow-xl shadow-amber-500/5">
-        <AlertTriangle className="w-8 h-8 text-amber-500 shrink-0" />
-        <div>
-          <h4 className="text-amber-500 font-black uppercase italic text-sm mb-1">CHÍNH SÁCH NÂNG CẤP VIP</h4>
-          <p className="text-slate-300 text-xs font-medium italic leading-relaxed">
-            Hệ thống Diamond Nova <b>KHÔNG hỗ trợ cộng dồn VIP</b>. Khi bạn kích hoạt gói VIP mới, thời hạn của gói VIP hiện tại sẽ <b>bị mất hoàn toàn</b> và được thay thế bằng gói mới. Vui lòng cân nhắc trước khi thực hiện.
-          </p>
+      {/* Expiration Alert Section */}
+      {user.isVip && (
+        <div className="p-8 bg-blue-600/5 border border-blue-500/20 rounded-[3rem] flex items-center justify-between shadow-xl">
+           <div className="flex items-center gap-6">
+              <div className="p-4 bg-blue-600/10 rounded-2xl">
+                 <Clock className="w-8 h-8 text-blue-400 animate-pulse" />
+              </div>
+              <div>
+                 <h4 className="text-lg font-black text-white italic uppercase">THỜI HẠN VIP HIỆN TẠI</h4>
+                 <p className="text-slate-500 text-xs font-bold italic uppercase tracking-widest">
+                   Hạng: <span className="text-blue-400">{user.vipTier.toUpperCase()}</span> | 
+                   Ngày hết hạn: <span className="text-white">{user.vipUntil ? new Date(user.vipUntil).toLocaleString('vi-VN') : 'N/A'}</span>
+                 </p>
+              </div>
+           </div>
+           <button onClick={() => window.scrollTo({top: 600, behavior: 'smooth'})} className="px-8 py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase italic tracking-widest shadow-lg shadow-blue-600/20">GIA HẠN NGAY</button>
         </div>
+      )}
+
+      {/* VIP TOP Leaderboard */}
+      <div className="glass-card p-10 rounded-[3.5rem] border border-amber-500/10 bg-amber-500/5">
+         <div className="flex items-center gap-4 mb-8">
+            <div className="p-3 bg-amber-500/10 rounded-2xl text-amber-500 border border-amber-500/20"><Trophy className="w-6 h-6" /></div>
+            <h3 className="text-2xl font-black text-white italic uppercase tracking-tighter">BẢNG VÀNG ĐẠI GIA NOVA</h3>
+         </div>
+         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {vipLeaderboard.length === 0 ? (
+               <div className="col-span-full py-10 text-center text-slate-600 font-black italic uppercase text-xs">Chưa có dữ liệu vinh danh</div>
+            ) : (
+               vipLeaderboard.map((item, idx) => (
+                  <div key={idx} className="flex items-center gap-4 p-4 glass-card rounded-2xl border border-white/5 bg-slate-900/40">
+                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black ${idx === 0 ? 'bg-amber-500 text-black' : idx === 1 ? 'bg-slate-400 text-black' : idx === 2 ? 'bg-orange-700 text-white' : 'bg-slate-800 text-slate-500'}`}>
+                        {idx < 3 ? <Medal size={20} /> : idx + 1}
+                     </div>
+                     <div className="flex-1 overflow-hidden">
+                        <div className="text-[11px] font-black text-white uppercase truncate italic">{item.name}</div>
+                        <div className="text-[10px] font-black text-amber-500 italic">Tổng nạp: {item.total.toLocaleString()}đ</div>
+                     </div>
+                  </div>
+               ))
+            )}
+         </div>
       </div>
 
-      {/* Packages */}
+      {/* Packages Section */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {packages.map(pkg => (
           <div key={pkg.tier} className={`glass-card p-10 rounded-[3rem] border-2 transition-all shadow-xl flex flex-col justify-between group hover:scale-105 relative overflow-hidden ${pkg.rich} ${pkg.bg}`}>
-            {/* Rich Background Effect */}
             <div className={`absolute inset-0 pointer-events-none opacity-20 ${pkg.shimmer}`}></div>
-            
             <div className="text-center space-y-6 relative z-10">
               <div className="flex justify-center mb-2">
                 <Crown className={`w-12 h-12 vip-crown-float ${getVipCrownColor(pkg.tier)}`} />
@@ -168,12 +202,11 @@ const Vip: React.FC<Props> = ({ user, onUpdateUser }) => {
                 <div className="flex items-center gap-3 text-slate-400 text-xs italic font-bold"><CheckCircle2 size={14} className="text-emerald-500" /> +50% Thưởng nhiệm vụ</div>
                 <div className="flex items-center gap-3 text-slate-400 text-xs italic font-bold"><CheckCircle2 size={14} className="text-emerald-500" /> Ưu tiên duyệt lệnh 5 phút</div>
                 <div className="flex items-center gap-3 text-slate-400 text-xs italic font-bold"><CheckCircle2 size={14} className="text-emerald-500" /> Huy hiệu {pkg.tier.toUpperCase()} hồ sơ</div>
-                <div className="flex items-center gap-3 text-slate-400 text-xs italic font-bold"><CheckCircle2 size={14} className="text-emerald-500" /> Mở khóa Avatar VIP</div>
               </div>
             </div>
             <button 
               onClick={() => openDeposit(pkg)}
-              className={`relative z-10 w-full mt-10 py-5 rounded-2xl font-black text-[11px] uppercase italic tracking-widest transition-all ${pkg.tier === VipTier.ELITE ? 'bg-purple-600 shadow-purple-600/20' : pkg.tier === VipTier.PRO ? 'bg-amber-500 text-black shadow-amber-500/20' : 'bg-blue-600 shadow-blue-600/20'} text-white active:scale-95 shadow-lg`}
+              className={`relative z-10 w-full mt-10 py-5 rounded-2xl font-black text-[11px] uppercase italic tracking-widest transition-all ${pkg.tier === VipTier.ELITE ? 'bg-purple-600' : pkg.tier === VipTier.PRO ? 'bg-amber-500 text-black' : 'bg-blue-600'} text-white active:scale-95 shadow-lg`}
             >
               NÂNG CẤP NGAY
             </button>
@@ -181,7 +214,7 @@ const Vip: React.FC<Props> = ({ user, onUpdateUser }) => {
         ))}
       </div>
 
-      {/* VIP History Table */}
+      {/* History Table */}
       <div className="glass-card p-10 rounded-[3rem] border border-white/5 bg-slate-900/20 shadow-2xl">
          <div className="flex items-center gap-4 mb-8">
             <div className="p-3 bg-blue-600/10 rounded-2xl text-blue-400 border border-blue-500/20"><History className="w-6 h-6" /></div>
@@ -207,10 +240,12 @@ const Vip: React.FC<Props> = ({ user, onUpdateUser }) => {
                         <tr key={v.id || i} className="group hover:bg-white/[0.02] transition-colors">
                            <td className="px-6 py-5 font-bold text-white uppercase italic">{v.vip_tier}</td>
                            <td className="px-6 py-5 font-black text-blue-500">{v.amount_vnd?.toLocaleString()}đ</td>
-                           <td className="px-6 py-5 text-slate-500 text-xs font-medium italic">{new Date(v.created_at).toLocaleString('vi-VN')}</td>
-                           <td className="px-6 py-5">
-                              <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase italic border ${v.status === 'pending' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' : v.status === 'completed' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>
-                                 {v.status === 'pending' ? 'ĐANG CHỜ DUYỆT' : v.status === 'completed' ? 'THÀNH CÔNG' : 'BỊ TỪ CHỐI'}
+                           <td className="px-6 py-5 text-slate-500 text-xs font-medium italic">
+                             {new Date(v.created_at).toLocaleString('vi-VN')}
+                           </td>
+                           <td className="px-6 py-5 text-right">
+                              <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase italic border ${v.status === 'completed' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : v.status === 'pending' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>
+                                 {v.status === 'pending' ? 'ĐANG CHỜ' : v.status === 'completed' ? 'THÀNH CÔNG' : 'BỊ TỪ CHỐI'}
                               </span>
                            </td>
                         </tr>
@@ -221,23 +256,23 @@ const Vip: React.FC<Props> = ({ user, onUpdateUser }) => {
          </div>
       </div>
 
-      {/* Modal Nạp VIP */}
+      {/* Modal Deposit */}
       {showDepositModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/90 backdrop-blur-md overflow-y-auto">
           <div className="glass-card w-full max-w-2xl p-8 rounded-[3rem] border border-white/10 relative my-auto animate-in zoom-in-95 shadow-3xl">
             <button onClick={() => setShowDepositModal(false)} className="absolute top-6 right-6 p-2 text-slate-500 hover:text-white transition-colors"><X size={24} /></button>
-            <h2 className="text-2xl font-black text-white italic uppercase mb-8">CHỌN PHƯƠNG THỨC THANH TOÁN</h2>
+            <h2 className="text-2xl font-black text-white italic uppercase mb-8">PHƯƠNG THỨC THANH TOÁN</h2>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-               <button onClick={() => setPaymentMethod('points')} className={`p-6 rounded-3xl border-2 transition-all flex flex-col items-center gap-3 ${paymentMethod === 'points' ? 'border-blue-500 bg-blue-500/10 shadow-lg shadow-blue-500/10' : 'border-slate-800 bg-slate-900/40 hover:border-slate-700'}`}>
+               <button onClick={() => setPaymentMethod('points')} className={`p-6 rounded-3xl border-2 transition-all flex flex-col items-center gap-3 ${paymentMethod === 'points' ? 'border-blue-500 bg-blue-500/10' : 'border-slate-800 bg-slate-900/40'}`}>
                   <Wallet className="w-8 h-8 text-blue-400" />
-                  <span className="font-black text-[10px] uppercase italic">Dùng Điểm Nova (P)</span>
-                  <span className="text-xs text-slate-500 italic">Giá: {(selectedPkg.vnd * 10).toLocaleString()} P</span>
+                  <span className="font-black text-[10px] uppercase italic">Điểm Nova (P)</span>
+                  <span className="text-xs text-slate-500">{(selectedPkg.vnd * 10).toLocaleString()} P</span>
                </button>
-               <button onClick={() => setPaymentMethod('bank')} className={`p-6 rounded-3xl border-2 transition-all flex flex-col items-center gap-3 ${paymentMethod === 'bank' ? 'border-amber-500 bg-amber-500/10 shadow-lg shadow-amber-500/10' : 'border-slate-800 bg-slate-900/40 hover:border-slate-700'}`}>
+               <button onClick={() => setPaymentMethod('bank')} className={`p-6 rounded-3xl border-2 transition-all flex flex-col items-center gap-3 ${paymentMethod === 'bank' ? 'border-amber-500 bg-amber-500/10' : 'border-slate-800 bg-slate-900/40'}`}>
                   <CreditCard className="w-8 h-8 text-amber-400" />
-                  <span className="font-black text-[10px] uppercase italic">Chuyển khoản ngoài (VNĐ)</span>
-                  <span className="text-xs text-slate-500 italic">Giá: {selectedPkg.vnd.toLocaleString()} VNĐ</span>
+                  <span className="font-black text-[10px] uppercase italic">Ngân hàng (VNĐ)</span>
+                  <span className="text-xs text-slate-500">{selectedPkg.vnd.toLocaleString()} VNĐ</span>
                </button>
             </div>
 
@@ -248,7 +283,7 @@ const Vip: React.FC<Props> = ({ user, onUpdateUser }) => {
                     <span className="font-black text-white">{user.balance.toLocaleString()} P</span>
                  </div>
                  <button onClick={handleBuyWithPoints} disabled={isLoading} className="w-full py-5 bg-blue-600 text-white font-black rounded-2xl uppercase italic text-[11px] shadow-lg shadow-blue-600/20 active:scale-95 transition-all">
-                    {isLoading ? <Loader2 className="animate-spin mx-auto" /> : 'XÁC NHẬN THANH TOÁN ĐIỂM'}
+                    {isLoading ? <Loader2 className="animate-spin mx-auto" /> : 'XÁC NHẬN THANH TOÁN'}
                  </button>
               </div>
             )}
@@ -267,12 +302,8 @@ const Vip: React.FC<Props> = ({ user, onUpdateUser }) => {
                           <button onClick={() => copyToClipboard(randomBank?.account)} className="text-slate-500 hover:text-blue-400 transition-colors"><Copy size={14} /></button>
                        </div>
                     </div>
-                    <div className="flex items-center justify-between p-4 bg-slate-950 border border-white/5 rounded-2xl">
-                       <span className="text-[10px] font-black text-slate-500 uppercase italic">Người hưởng thụ</span>
-                       <span className="font-bold text-white uppercase">{randomBank?.owner}</span>
-                    </div>
                     <div className="flex items-center justify-between p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl">
-                       <span className="text-[10px] font-black text-amber-500 uppercase italic shrink-0">Nội dung chuyển</span>
+                       <span className="text-[10px] font-black text-amber-500 uppercase italic shrink-0">Nội dung</span>
                        <div className="flex items-center gap-3 overflow-hidden">
                           <span className="text-[9px] font-bold text-white truncate">{generateTransferContent()}</span>
                           <button onClick={() => copyToClipboard(generateTransferContent())} className="text-amber-500 hover:text-amber-400 transition-colors shrink-0"><Copy size={14} /></button>
@@ -280,15 +311,10 @@ const Vip: React.FC<Props> = ({ user, onUpdateUser }) => {
                     </div>
                  </div>
 
-                 <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest italic">Tải lên bill thanh toán (Nếu có)</label>
-                    <div className="relative h-32 border-2 border-dashed border-slate-800 rounded-3xl flex flex-col items-center justify-center text-slate-600 hover:border-amber-500 hover:text-amber-400 transition-all cursor-pointer bg-slate-900/20 group">
-                       {billFile ? <img src={billFile} className="h-full w-full object-contain rounded-3xl" /> : (
-                         <>
-                           <ImageIcon size={32} className="mb-2 group-hover:scale-110 transition-transform" />
-                           <span className="text-[10px] font-bold uppercase">Nhấn để tải ảnh bill</span>
-                         </>
-                       )}
+                 <div className="space-y-2 text-center">
+                    <label className="text-[10px] font-black text-slate-500 uppercase italic">Tải ảnh bill chuyển khoản</label>
+                    <div className="relative h-24 border-2 border-dashed border-slate-800 rounded-3xl flex flex-col items-center justify-center text-slate-600 hover:border-amber-500 transition-all cursor-pointer bg-slate-900/20">
+                       {billFile ? <img src={billFile} className="h-full w-full object-contain rounded-3xl" /> : <ImageIcon size={24} />}
                        <input type="file" accept="image/*" onChange={(e) => {
                           const file = e.target.files?.[0];
                           if(file) {
@@ -301,7 +327,7 @@ const Vip: React.FC<Props> = ({ user, onUpdateUser }) => {
                  </div>
 
                  <button onClick={handleBankDepositSubmit} disabled={isLoading} className="w-full py-5 bg-amber-600 text-white font-black rounded-2xl uppercase italic text-[11px] shadow-lg shadow-amber-600/20 flex items-center justify-center gap-3 active:scale-95 transition-all">
-                    {isLoading ? <Loader2 className="animate-spin" /> : <><CheckCircle size={16} /> XÁC NHẬN ĐÃ CHUYỂN KHOẢN</>}
+                    {isLoading ? <Loader2 className="animate-spin" /> : 'ĐÃ CHUYỂN KHOẢN'}
                  </button>
               </div>
             )}

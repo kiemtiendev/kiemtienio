@@ -121,16 +121,17 @@ const App: React.FC = () => {
     await dbService.updateUser(updated.id, updated); 
   };
 
-  // VIP Expiration Logic
+  // VIP Expiration Logic (Updated to 3 days = 72 hours)
   const vipExpiringSoon = useMemo(() => {
     if (!user?.isVip || !user?.vipUntil) return null;
     const until = new Date(user.vipUntil).getTime();
     const now = new Date().getTime();
     const diff = until - now;
-    if (diff > 0 && diff < 86400000) {
-      const hours = Math.floor(diff / (1000 * 60 * 60));
-      const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      return { hours, mins };
+    // Notify if less than 72 hours (259,200,000 ms)
+    if (diff > 0 && diff < 259200000) {
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      return { days, hours };
     }
     return null;
   }, [user?.isVip, user?.vipUntil]);
@@ -262,12 +263,14 @@ const App: React.FC = () => {
 
       <main className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-10 relative">
         <header className="flex flex-col gap-4 mb-10">
-           {/* VIP Expiration Alert Banner */}
+           {/* VIP Expiration Alert Banner (Updated to 3 days) */}
            {vipExpiringSoon && (
              <div className="w-full bg-amber-500/10 border border-amber-500/30 p-4 rounded-2xl flex items-center justify-between animate-pulse shadow-lg shadow-amber-500/5">
                 <div className="flex items-center gap-3">
                    <AlertTriangle className="text-amber-500 w-5 h-5" />
-                   <p className="text-[11px] font-black text-amber-500 uppercase italic">Cảnh báo: Gói VIP của bạn sẽ hết hạn trong {vipExpiringSoon.hours} giờ {vipExpiringSoon.mins} phút!</p>
+                   <p className="text-[11px] font-black text-amber-500 uppercase italic">
+                     Cảnh báo: Gói VIP của bạn sẽ hết hạn trong {vipExpiringSoon.days} ngày {vipExpiringSoon.hours} giờ!
+                   </p>
                 </div>
                 <button onClick={() => setCurrentView(AppView.VIP)} className="bg-amber-500 text-black px-4 py-1.5 rounded-lg text-[9px] font-black uppercase italic hover:bg-amber-400 transition-all shadow-lg shadow-amber-500/20">Gia hạn ngay</button>
              </div>
