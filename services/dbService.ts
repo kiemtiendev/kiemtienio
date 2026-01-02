@@ -3,8 +3,20 @@ import { createClient } from '@supabase/supabase-js';
 import { User, Giftcode, WithdrawalRequest, AdminNotification, Announcement, AdBanner, ActivityLog } from '../types.ts';
 import { REFERRAL_REWARD, SECURE_AUTH_KEY } from '../constants.tsx';
 
-const supabaseUrl = (window as any).process?.env?.SUPABASE_URL || '';
-const supabaseKey = (window as any).process?.env?.SUPABASE_ANON_KEY || '';
+/**
+ * Lấy thông tin cấu hình từ Environment Variables
+ * Sử dụng process.env để đồng nhất với cách lấy API_KEY cho Gemini
+ * Kiểm tra cả biến có prefix VITE_ và biến gốc để đảm bảo tương thích
+ */
+// @ts-ignore
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
+// @ts-ignore
+const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error("NOVA SYNC: Thiếu cấu hình Supabase URL hoặc Anon Key! Vui lòng kiểm tra lại cấu hình môi trường trong index.html hoặc Vercel.");
+}
+
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
 const mapUser = (u: any): User => {
@@ -61,7 +73,6 @@ export const dbService = {
       if (refId) {
         const { data: refUser } = await supabase.from('users_data').select('*').eq('id', refId).maybeSingle();
         if (refUser) {
-          // Khi đăng ký giới thiệu, cũng nên dùng RPC nếu RLS đã bật
           await supabase.rpc('secure_add_points', { target_id: refId, auth_key: SECURE_AUTH_KEY });
           await supabase.from('users_data').update({
             referral_count: Number(refUser.referral_count || 0) + 1
@@ -105,7 +116,6 @@ export const dbService = {
     return await supabase.from('users_data').update(dbUpdates).eq('id', id);
   },
 
-  // Phương thức bảo mật mới để cộng điểm qua RPC
   addPointsSecurely: async (id: string) => {
     const { error } = await supabase.rpc('secure_add_points', { 
       target_id: id, 

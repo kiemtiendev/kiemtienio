@@ -16,8 +16,12 @@ import {
 } from 'lucide-react';
 import { AppView, TaskGate } from './types.ts';
 
-// Cấu hình tài chính
-export const ADMIN_ID = "7790668848";
+/**
+ * Cấu hình bảo mật và tài chính
+ * Sử dụng process.env để lấy biến môi trường theo tiêu chuẩn bảo mật Nova
+ */
+// @ts-ignore
+export const ADMIN_ID = process.env.ADMIN_ID || process.env.VITE_ADMIN_ID || "7790668848";
 export const EXCHANGE_RATE = 22000; // 1$ = 22k
 export const POINT_EXCHANGE = 10;   // 1 VNĐ = 10 điểm
 export const RATE_VND_TO_POINT = 10;
