@@ -1,102 +1,26 @@
 
-import React, { useMemo, useEffect, useState, useRef } from 'react';
-import { User, AppView, Announcement, AdBanner, AdminNotification } from '../types.ts';
+import React, { useState, useEffect } from 'react';
+import { User, Announcement } from '../types.ts';
 import { dbService } from '../services/dbService.ts';
-import { formatK, DAILY_TASK_LIMIT } from '../constants.tsx';
-import { 
-  ArrowUpRight, 
-  Megaphone, 
-  Zap, 
-  Star, 
-  TrendingUp, 
-  ShoppingBag, 
-  ExternalLink, 
-  Bell, 
-  Trophy, 
-  ArrowRight,
-  History,
-  Info,
-  Bot,
-  Sparkles,
-  ChevronRight,
-  ChevronLeft
-} from 'lucide-react';
+import { Sparkles, Star, TrendingUp, Zap, Clock, CreditCard, ArrowRight } from 'lucide-react';
+import { formatK } from '../constants.tsx';
 
-interface Props {
+interface DashboardProps {
   user: User;
-  setView: (view: AppView) => void;
+  setView: (view: any) => void;
 }
 
-const StatCard: React.FC<{ 
-  icon: React.ReactNode, 
-  label: string, 
-  value: string | number, 
-  suffix: string, 
-  borderColor: string, 
-  iconColor: string,
-  index: number
-}> = ({ icon, label, value, suffix, borderColor, iconColor, index }) => {
-  return (
-    <div 
-      className={`glass-card p-6 md:p-8 rounded-[2.5rem] border-l-4 ${borderColor} relative overflow-hidden group hover:bg-white/[0.04] transition-all duration-300 shadow-xl`}
-    >
-      <div 
-        className={`absolute top-0 right-0 w-24 h-24 ${iconColor} opacity-[0.1] -translate-y-4 translate-x-4 group-hover:scale-110 transition-transform duration-700 pointer-events-none`}
-      >
-        {React.cloneElement(icon as React.ReactElement<any>, { className: 'w-full h-full filter blur-[1px]' })}
-      </div>
-      <div className="relative z-10">
-        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 italic block">
-          {label}
-        </span>
-        <div className="flex items-baseline gap-2">
-          <h2 className="text-3xl md:text-4xl font-black text-white italic tracking-tighter">
-            {value}
-          </h2>
-          <span className={`${iconColor} font-black text-[10px] uppercase`}>
-            {suffix}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const Dashboard: React.FC<Props> = ({ user, setView }) => {
+const Dashboard: React.FC<DashboardProps> = ({ user, setView }) => {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [ads, setAds] = useState<AdBanner[]>([]);
-  const [currentAdIdx, setCurrentAdIdx] = useState(0);
-  const [personalNotifications, setPersonalNotifications] = useState<AdminNotification[]>([]);
 
   useEffect(() => {
-    const fetchData = async () => {
-      const anns = await dbService.getAnnouncements();
-      setAnnouncements(anns);
-      const allAds = await dbService.getAds(false);
-      setAds(allAds.filter(a => a.isActive));
-      const notifs = await dbService.getNotifications(user.id);
-      setPersonalNotifications(notifs.slice(0, 5));
-    };
-    fetchData();
-  }, [user.id]);
+    dbService.getAnnouncements().then(setAnnouncements);
+  }, []);
 
-  useEffect(() => {
-    if (ads.length <= 1) return;
-    const interval = setInterval(() => {
-      setCurrentAdIdx(prev => (prev + 1) % ads.length);
-    }, 6000);
-    return () => clearInterval(interval);
-  }, [ads]);
-
-  const latestAnnouncement = announcements[0];
-  
   return (
-    <div className="space-y-6 md:space-y-8 animate-in fade-in duration-700">
-      {/* Marquee Banner */}
-      <div className="w-full bg-blue-600/10 border border-blue-500/20 rounded-2xl overflow-hidden py-3 px-6 flex items-center gap-4 group shadow-lg backdrop-blur-xl">
-        <div className="bg-blue-600 p-1.5 rounded-lg shadow-blue-600/30 shrink-0">
-          <Megaphone className="w-4 h-4 text-white" />
-        </div>
+    <div className="space-y-10 animate-in fade-in duration-500 pb-20">
+      {/* Fix: Added announcements state and fetch logic to fix "Cannot find name 'announcements'" */}
+      <div className="glass-card p-4 rounded-3xl flex items-center gap-4 bg-slate-900/40 border border-white/5">
         <div className="flex-1 overflow-hidden relative">
           <div className="whitespace-nowrap animate-marquee flex gap-10">
              {announcements.length > 0 ? (
@@ -106,7 +30,7 @@ const Dashboard: React.FC<Props> = ({ user, setView }) => {
                  </span>
                ))
              ) : (
-               <span className="text-[10px] font-black text-white/80 uppercase italic tracking-widest">CHÀO MỪNG ĐẾN VỚI DIAMOND NOVA - HỆ THỐNG KIẾM TIỀN & KIM CƯƠNG FF SỐ 1 VN</span>
+               <span className="text-[10px] font-black text-white/80 uppercase italic tracking-widest">CHÀO MỪNG ĐẾN VỚI DIAMOND NOVA - HỆ THỐNG NHIỆM VỤ KIẾM TIỀN QUÂN HUY KIM CƯƠNG MIỄN PHÍ</span>
              )}
           </div>
         </div>
@@ -114,172 +38,66 @@ const Dashboard: React.FC<Props> = ({ user, setView }) => {
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <h1 className="text-3xl md:text-4xl font-black text-white uppercase italic tracking-tighter leading-none nova-gradient">DIAMOND HUB</h1>
-          <p className="text-slate-500 font-bold text-[10px] uppercase tracking-[0.2em] mt-2">Xác nhận định danh: <span className="text-blue-400 italic font-black">{user.fullname}</span></p>
+          <h1 className="text-3xl md:text-4xl font-black text-white uppercase italic tracking-tighter leading-none nova-gradient">DIAMOND NOVA HUB</h1>
+          <p className="text-slate-500 font-bold text-[10px] uppercase tracking-[0.2em] mt-2">HỆ THỐNG NHIỆM VỤ - KIẾM TIỀN <span className="text-blue-400 italic font-black">Online 24/7</span></p>
         </div>
-        <div className="flex gap-3">
-          <button onClick={() => setView(AppView.TASKS)} className="flex-1 md:flex-none bg-blue-600 hover:bg-blue-500 text-white font-black px-8 py-4 rounded-2xl shadow-lg shadow-blue-600/20 flex items-center justify-center gap-3 transition-all active:scale-95 uppercase tracking-widest text-[10px] italic">BẮT ĐẦU <ArrowUpRight className="w-4 h-4" /></button>
-          <button onClick={() => setView(AppView.LEADERBOARD)} className="p-4 bg-slate-900 border border-white/5 rounded-2xl hover:bg-slate-800 transition-all text-amber-500 shadow-xl active:scale-95"><Trophy className="w-6 h-6" /></button>
+        <div className="flex items-center gap-4 bg-slate-900/50 p-2 rounded-2xl border border-white/5">
+          <div className="flex flex-col items-end px-4">
+            <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Server Status</span>
+            <span className="text-[10px] font-black text-emerald-500 uppercase italic">Stable Vision 1.0</span>
+          </div>
+          <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center"><Zap className="w-5 h-5 text-emerald-500 animate-pulse" /></div>
         </div>
       </div>
 
-      {/* Ads Section in Dashboard */}
-      {ads.length > 0 && (
-        <div className="relative group overflow-hidden rounded-[2.5rem] border border-white/5 shadow-2xl animate-in zoom-in-95 duration-500">
-           <div className="absolute inset-0 bg-blue-600/5 animate-pulse"></div>
-           <img 
-             src={ads[currentAdIdx].imageUrl} 
-             alt={ads[currentAdIdx].title}
-             className="w-full aspect-[21/9] md:aspect-[3/1] object-cover transition-transform duration-1000 group-hover:scale-105"
-           />
-           <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent flex flex-col justify-end p-6 md:p-12">
-              <div className="flex items-center gap-2 mb-2">
-                 <span className="px-2 py-0.5 bg-blue-600 text-white text-[8px] font-black rounded italic">HỆ THỐNG ĐỀ XUẤT</span>
-                 <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest italic">Tài trợ bởi Nova Ads</span>
-              </div>
-              <h3 className="text-xl md:text-3xl font-black text-white italic uppercase tracking-tight mb-4">{ads[currentAdIdx].title}</h3>
-              <a 
-                href={ads[currentAdIdx].targetUrl} 
-                target="_blank" 
-                className="w-fit flex items-center gap-3 px-6 py-3 bg-white text-black rounded-xl font-black text-[10px] uppercase italic tracking-widest hover:bg-blue-500 hover:text-white transition-all shadow-xl"
-              >
-                KHÁM PHÁ NGAY <ArrowRight className="w-4 h-4" />
-              </a>
-           </div>
-           
-           <div className="absolute bottom-4 right-8 flex gap-1.5">
-             {ads.map((_, i) => (
-               <div 
-                 key={i} 
-                 onClick={() => setCurrentAdIdx(i)}
-                 className={`w-2 h-2 rounded-full cursor-pointer transition-all ${i === currentAdIdx ? 'bg-blue-500 w-6' : 'bg-white/20'}`}
-               ></div>
-             ))}
-           </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="glass-card p-8 rounded-[2.5rem] border-l-8 border-l-blue-600 bg-blue-600/5 shadow-xl group hover:scale-105 transition-all cursor-pointer" onClick={() => setView('tasks')}>
+           <TrendingUp className="w-8 h-8 text-blue-500 mb-6 group-hover:rotate-12 transition-transform" />
+           <p className="text-[10px] font-black text-slate-500 uppercase italic mb-1">Nhiệm vụ hôm nay</p>
+           <h3 className="text-3xl font-black text-white italic">{user.tasksToday || 0}</h3>
         </div>
-      )}
+        <div className="glass-card p-8 rounded-[2.5rem] border-l-8 border-l-amber-500 bg-amber-500/5 shadow-xl group hover:scale-105 transition-all">
+           <Star className="w-8 h-8 text-amber-500 mb-6 group-hover:scale-110 transition-transform" />
+           <p className="text-[10px] font-black text-slate-500 uppercase italic mb-1">Số dư hiện tại</p>
+           <h3 className="text-3xl font-black text-white italic">{formatK(user.balance)} P</h3>
+        </div>
+        <div className="glass-card p-8 rounded-[2.5rem] border-l-8 border-l-emerald-600 bg-emerald-600/5 shadow-xl group hover:scale-105 transition-all">
+           <Zap className="w-8 h-8 text-emerald-500 mb-6 group-hover:-translate-y-1 transition-transform" />
+           <p className="text-[10px] font-black text-slate-500 uppercase italic mb-1">Tổng thu nhập</p>
+           <h3 className="text-3xl font-black text-white italic">{formatK(user.totalEarned)} P</h3>
+        </div>
+        <div className="glass-card p-8 rounded-[2.5rem] border-l-8 border-l-purple-600 bg-purple-600/5 shadow-xl group hover:scale-105 transition-all">
+           <Clock className="w-8 h-8 text-purple-500 mb-6 group-hover:rotate-12 transition-transform" />
+           <p className="text-[10px] font-black text-slate-500 uppercase italic mb-1">Ngày tham gia</p>
+           <h3 className="text-xl font-black text-white italic">{new Date(user.joinDate).toLocaleDateString('vi-VN')}</h3>
+        </div>
+      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {latestAnnouncement && (
-          <div 
-            onClick={() => setView(AppView.NOTIFICATIONS)}
-            className="glass-card p-6 md:p-8 rounded-[2.5rem] border border-blue-500/10 bg-gradient-to-r from-blue-600/5 to-transparent flex items-center gap-6 group cursor-pointer hover:border-blue-500/30 transition-all shadow-xl relative overflow-hidden h-full"
-          >
-            <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-600/30 shrink-0">
-               <Bell className="w-8 h-8 text-white animate-bounce" />
-            </div>
-            <div className="flex-1">
-               <div className="flex items-center gap-2 mb-1">
-                 <span className="text-[9px] font-black text-blue-400 uppercase tracking-widest italic">TIN MỚI</span>
-                 <span className="px-1.5 py-0.5 bg-red-600 text-white text-[7px] font-black rounded italic">NEW</span>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pt-10">
+         <div className="lg:col-span-2 glass-card p-10 rounded-[3.5rem] border border-white/5 relative overflow-hidden bg-gradient-to-br from-blue-600/10 to-transparent">
+            <Sparkles className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none w-64 h-64 text-blue-500" />
+            <div className="relative z-10 space-y-8">
+               <div>
+                  <h2 className="text-3xl font-black text-white uppercase italic tracking-tighter">BẮT ĐẦU KIẾM QUÂN HUY</h2>
+                  <p className="text-slate-400 text-sm font-medium italic mt-2">Tham gia giải đố và vượt link rút gọn để nhận hàng ngàn điểm Nova (P) mỗi ngày.</p>
                </div>
-               <h3 className="text-lg font-black text-white uppercase italic tracking-tighter mb-1 line-clamp-1">{latestAnnouncement.title}</h3>
-               <p className="text-slate-500 text-[11px] font-medium italic line-clamp-1">{latestAnnouncement.content}</p>
-            </div>
-          </div>
-        )}
-
-        <div 
-          onClick={() => setView(AppView.SUPPORT)}
-          className="glass-card p-6 md:p-8 rounded-[2.5rem] border border-violet-500/10 bg-gradient-to-r from-violet-600/5 to-transparent flex items-center gap-6 group cursor-pointer hover:border-violet-500/30 transition-all shadow-xl relative overflow-hidden h-full"
-        >
-          <div className="w-16 h-16 bg-violet-600 rounded-2xl flex items-center justify-center shadow-lg shadow-violet-600/30 shrink-0">
-             <Bot className="w-8 h-8 text-white group-hover:scale-110 transition-transform" />
-          </div>
-          <div className="flex-1">
-             <div className="flex items-center gap-2 mb-1">
-               <span className="text-[9px] font-black text-violet-400 uppercase tracking-widest italic">AI ASSISTANT</span>
-               <Sparkles className="w-3 h-3 text-amber-400 animate-pulse" />
-             </div>
-             <h3 className="text-lg font-black text-white uppercase italic tracking-tighter mb-1">TRỢ LÝ GEMINI 3.0</h3>
-             <p className="text-slate-500 text-[11px] font-medium italic">Hỗ trợ 24/7 về nạp & rút</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatCard 
-          index={0}
-          icon={<Zap />}
-          label="Nhiệm vụ ngày"
-          value={user.tasksToday}
-          suffix={`/ ${DAILY_TASK_LIMIT}`}
-          borderColor="border-l-blue-600"
-          iconColor="text-blue-500"
-        />
-        <StatCard 
-          index={1}
-          icon={<Star />}
-          label="Số dư điểm"
-          value={formatK(user.balance)}
-          suffix="P"
-          borderColor="border-l-emerald-600"
-          iconColor="text-emerald-500"
-        />
-        <StatCard 
-          index={2}
-          icon={<TrendingUp />}
-          label="Tổng tích lũy"
-          value={formatK(user.totalEarned || 0)}
-          suffix="P"
-          borderColor="border-l-purple-600"
-          iconColor="text-purple-500"
-        />
-      </div>
-
-      <div className="glass-card p-8 rounded-[2.5rem] border border-white/5 bg-slate-900/10 shadow-inner">
-        <div className="flex items-center gap-4 mb-6">
-           <div className="p-3 bg-blue-600/10 rounded-xl text-blue-400 border border-blue-500/20">
-              <History className="w-5 h-5" />
-           </div>
-           <div>
-              <h3 className="text-lg font-black text-white uppercase italic tracking-tighter">BẢNG TIN HOẠT ĐỘNG</h3>
-              <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest italic">Lịch sử giao dịch & thưởng cá nhân</p>
-           </div>
-        </div>
-
-        <div className="space-y-3">
-           {personalNotifications.length === 0 ? (
-             <div className="py-8 text-center">
-                <p className="text-slate-700 font-black uppercase italic tracking-widest text-[9px]">Chưa có thông báo hoạt động nào mới.</p>
-             </div>
-           ) : (
-             personalNotifications.map((n) => (
-               <div key={n.id} className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-all group">
-                  <div className="flex items-center gap-4">
-                     <div className={`p-2 rounded-lg ${n.type === 'referral' ? 'bg-purple-600/20 text-purple-400' : 'bg-blue-600/20 text-blue-400'}`}>
-                        {n.type === 'referral' ? <TrendingUp className="w-4 h-4" /> : <Info className="w-4 h-4" />}
-                     </div>
-                     <div>
-                        <h4 className="text-white font-black uppercase italic text-xs group-hover:text-blue-400 transition-colors">{n.title}</h4>
-                        <p className="text-slate-500 text-[10px] font-medium italic">{n.content}</p>
-                     </div>
-                  </div>
-                  <span className="text-[9px] text-slate-700 font-black italic">{new Date(n.createdAt).toLocaleDateString('vi-VN')}</span>
+               <div className="flex flex-wrap gap-4">
+                  <button onClick={() => setView('tasks')} className="px-8 py-4 bg-blue-600 text-white rounded-2xl font-black uppercase italic text-[11px] tracking-widest shadow-xl shadow-blue-600/20 flex items-center gap-3 active:scale-95 transition-all">LÀM NHIỆM VỤ <ArrowRight size={16} /></button>
+                  <button onClick={() => setView('guide')} className="px-8 py-4 bg-slate-900 text-slate-400 rounded-2xl font-black uppercase italic text-[11px] tracking-widest border border-white/5 hover:bg-slate-800 transition-all">XEM HƯỚNG DẪN</button>
                </div>
-             ))
-           )}
-        </div>
-        
-        <button 
-          onClick={() => setView(AppView.NOTIFICATIONS)}
-          className="w-full mt-6 py-3 border border-white/5 rounded-xl text-[9px] font-black text-slate-500 uppercase italic tracking-widest hover:text-white hover:border-blue-500/30 transition-all bg-white/[0.01]"
-        >
-          XEM TẤT CẢ THÔNG BÁO
-        </button>
-      </div>
+            </div>
+         </div>
 
-      <style>{`
-        @keyframes marquee {
-          0% { transform: translateX(100%); }
-          100% { transform: translateX(-100%); }
-        }
-        .animate-marquee {
-          animation: marquee 30s linear infinite;
-        }
-      `}</style>
+         <div className="glass-card p-10 rounded-[3.5rem] border border-white/5 flex flex-col items-center text-center justify-center space-y-6 bg-slate-900/40">
+            <div className="w-20 h-20 bg-emerald-500/10 rounded-3xl flex items-center justify-center border border-emerald-500/20"><CreditCard className="w-10 h-10 text-emerald-500" /></div>
+            <h3 className="text-xl font-black text-white uppercase italic tracking-tighter">QUY ĐỔI THƯỞNG</h3>
+            <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest leading-relaxed">Đổi điểm lấy Quân Huy, Kim Cương <br />hoặc Tiền mặt về ATM</p>
+            <button onClick={() => setView('withdraw')} className="w-full py-4 bg-white text-black rounded-2xl font-black uppercase italic text-[10px] tracking-widest hover:bg-blue-600 hover:text-white transition-all">RÚT THƯỞNG NGAY</button>
+         </div>
+      </div>
     </div>
   );
 };
 
+// Fix: Added default export
 export default Dashboard;

@@ -33,10 +33,10 @@ const Guide: React.FC = () => {
             </div>
             <h1 className="text-5xl md:text-7xl font-black text-white leading-[0.9] uppercase tracking-tighter italic">
               CẨM NANG <br />
-              <span className="nova-gradient">CÀY NHIỆM VỤ</span>
+              <span className="nova-gradient">NHẬN THƯỞNG GAME</span>
             </h1>
             <p className="text-slate-400 text-lg font-medium leading-relaxed max-w-2xl">
-              Hệ thống Diamond Nova sử dụng cơ chế vượt link rút gọn an toàn. Hãy làm theo 3 bước sau để nhận thưởng điểm (P) không giới hạn mỗi ngày.
+              Hệ thống Diamond Nova cho phép bạn Nhận Thẻ Game Quân Huy - Kim Cương Miễn Phí 100% qua 3 bước đơn giản.
             </p>
         </div>
       </div>
@@ -49,7 +49,7 @@ const Guide: React.FC = () => {
            </div>
            <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest italic block mb-2">BƯỚC 01</span>
            <h3 className="text-2xl font-black text-white uppercase italic tracking-tighter mb-4 leading-none">CHỌN CỔNG <br /> NHIỆM VỤ</h3>
-           <p className="text-slate-500 text-sm font-medium leading-relaxed">Vào mục "Kiếm Kim Cương", chọn một cổng (Link4M, LayMaNgay,...) còn quota để bắt đầu.</p>
+           <p className="text-slate-500 text-sm font-medium leading-relaxed">Vào mục "Nhận Quân Huy - Kim Cương", chọn một cổng rút gọn link để bắt đầu kiếm điểm P.</p>
         </div>
 
         <div className="glass-card p-10 rounded-[3rem] border border-white/5 relative group hover:border-amber-500/30 transition-all">
@@ -58,7 +58,7 @@ const Guide: React.FC = () => {
            </div>
            <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest italic block mb-2">BƯỚC 02</span>
            <h3 className="text-2xl font-black text-white uppercase italic tracking-tighter mb-4 leading-none">VƯỢT LINK <br /> AN TOÀN</h3>
-           <p className="text-slate-500 text-sm font-medium leading-relaxed">Làm theo hướng dẫn của link rút gọn (Vượt Captcha, Đợi giây) để lấy mã KEY cuối cùng.</p>
+           <p className="text-slate-500 text-sm font-medium leading-relaxed">Làm theo hướng dẫn của link rút gọn để lấy mã xác nhận NOVA KEY cuối cùng.</p>
         </div>
 
         <div className="glass-card p-10 rounded-[3rem] border border-white/5 relative group hover:border-emerald-500/30 transition-all">
@@ -67,7 +67,7 @@ const Guide: React.FC = () => {
            </div>
            <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest italic block mb-2">BƯỚC 03</span>
            <h3 className="text-2xl font-black text-white uppercase italic tracking-tighter mb-4 leading-none">DÁN KEY <br /> NHẬN THƯỞNG</h3>
-           <p className="text-slate-500 text-sm font-medium leading-relaxed">Quay lại trang Diamond Nova, dán KEY vào khung xác nhận. Hệ thống sẽ cộng điểm (P) ngay lập tức.</p>
+           <p className="text-slate-500 text-sm font-medium leading-relaxed">Dán mã KEY vào khung xác thực để được hệ thống cộng điểm thưởng (P) ngay lập tức.</p>
         </div>
       </div>
 
@@ -84,7 +84,7 @@ const Guide: React.FC = () => {
                <div className="bg-emerald-600/20 p-1 rounded-lg border border-emerald-500/30">
                  <ArrowRightLeft className="w-4 h-4 text-emerald-400" />
                </div>
-               <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest italic">Tỷ lệ quy đổi: <span className="text-white">1 VNĐ = 10 P</span> (Ví dụ: 5.000 VNĐ = 50.000 P)</p>
+               <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest italic">Tỷ lệ quy đổi: <span className="text-white">1 VNĐ = 10 P</span></p>
             </div>
           </div>
 
@@ -101,15 +101,11 @@ const Guide: React.FC = () => {
               <ul className="space-y-4">
                 <li className="flex gap-3 text-sm text-slate-400 font-medium italic">
                   <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
-                  Hỗ trợ tất cả ngân hàng tại Việt Nam (MB, VCB, Momo...).
+                  Hỗ trợ rút về Ngân hàng hoặc Ví điện tử (Momo, MB Bank, VCB...).
                 </li>
                 <li className="flex gap-3 text-sm text-slate-400 font-medium italic">
                   <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
-                  Mức rút tối thiểu: <b className="text-white">50.000 P</b> (5.000đ).
-                </li>
-                <li className="flex gap-3 text-sm text-slate-400 font-medium italic">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
-                  Yêu cầu: Cập nhật STK & Tên ngân hàng trong phần Hồ Sơ.
+                  Thời gian xử lý: 5 - 30 phút kể từ lúc gửi yêu cầu.
                 </li>
               </ul>
             </div>
@@ -119,74 +115,22 @@ const Guide: React.FC = () => {
               <div className="flex items-center gap-4">
                  <div className="p-4 bg-purple-600/20 rounded-2xl text-purple-400 border border-purple-500/20"><Gamepad2 className="w-8 h-8" /></div>
                  <div>
-                   <h4 className="text-xl font-black text-white uppercase italic tracking-tighter">KIM CƯƠNG GAME</h4>
-                   <span className="text-[10px] font-bold text-slate-500">Tỷ lệ: 50.000 P = 25 Kim cương</span>
+                   <h4 className="text-xl font-black text-white uppercase italic tracking-tighter">RÚT THƯỞNG GAME</h4>
+                   <span className="text-[10px] font-bold text-slate-500">Nhận Thẻ Game Quân Huy - Kim Cương</span>
                  </div>
               </div>
               <ul className="space-y-4">
                 <li className="flex gap-3 text-sm text-slate-400 font-medium italic">
                   <CheckCircle2 className="w-5 h-5 text-purple-500 shrink-0" />
-                  Nạp trực tiếp vào tài khoản qua ID Game.
+                  Hỗ trợ quy đổi trực tiếp sang Quân Huy (Liên Quân) hoặc Kim Cương (Free Fire).
                 </li>
                 <li className="flex gap-3 text-sm text-slate-400 font-medium italic">
                   <CheckCircle2 className="w-5 h-5 text-purple-500 shrink-0" />
-                  Hỗ trợ game: Free Fire, Liên Quân Mobile.
-                </li>
-                <li className="flex gap-3 text-sm text-slate-400 font-medium italic">
-                  <CheckCircle2 className="w-5 h-5 text-purple-500 shrink-0" />
-                  Yêu cầu: Cung cấp chính xác ID Game trong phần Hồ Sơ.
+                  Yêu cầu cung cấp chính xác ID Game trong hồ sơ cá nhân.
                 </li>
               </ul>
             </div>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="glass-card p-6 rounded-[2rem] border border-white/5 flex items-center gap-4 bg-slate-900/40">
-               <Clock className="w-8 h-8 text-blue-400" />
-               <div>
-                  <p className="text-[10px] font-black text-slate-500 uppercase">Thời gian xử lý</p>
-                  <p className="text-white font-black italic text-lg tracking-tight">5 - 30 PHÚT</p>
-               </div>
-            </div>
-            <div className="glass-card p-6 rounded-[2rem] border border-white/5 flex items-center gap-4 bg-slate-900/40">
-               <ShieldAlert className="w-8 h-8 text-amber-400" />
-               <div>
-                  <p className="text-[10px] font-black text-slate-500 uppercase">Phí giao dịch</p>
-                  <p className="text-white font-black italic text-lg tracking-tight">MIỄN PHÍ 100%</p>
-               </div>
-            </div>
-            <div className="glass-card p-6 rounded-[2rem] border border-white/5 flex items-center gap-4 bg-slate-900/40">
-               <ShieldCheck className="w-8 h-8 text-emerald-400" />
-               <div>
-                  <p className="text-[10px] font-black text-slate-500 uppercase">Trạng thái cổng</p>
-                  <p className="text-emerald-400 font-black italic text-lg tracking-tight">HOẠT ĐỘNG 24/7</p>
-               </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Pro Tips */}
-      <div className="glass-card p-12 rounded-[4rem] border border-white/5 bg-slate-900/20 relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none"><Flame className="w-48 h-48 text-orange-500" /></div>
-        <h3 className="text-2xl font-black text-white uppercase italic tracking-tighter mb-8 flex items-center gap-4"><Zap className="w-7 h-7 text-amber-500" /> LƯU Ý QUAN TRỌNG (PRO TIPS)</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-           <div className="flex gap-5">
-              <div className="p-3 bg-emerald-500/10 rounded-xl h-fit border border-emerald-500/20"><CheckCircle2 className="w-5 h-5 text-emerald-500" /></div>
-              <p className="text-sm text-slate-400 font-medium leading-relaxed italic">Nên sử dụng trình duyệt Chrome hoặc Safari bản mới nhất để link hoạt động mượt nhất.</p>
-           </div>
-           <div className="flex gap-5">
-              <div className="p-3 bg-emerald-500/10 rounded-xl h-fit border border-emerald-500/20"><CheckCircle2 className="w-5 h-5 text-emerald-500" /></div>
-              <p className="text-sm text-slate-400 font-medium leading-relaxed italic">Nếu gặp lỗi mã không hợp lệ, hãy kiểm tra xem bạn đã lấy đúng mã Key ở trang cuối cùng chưa.</p>
-           </div>
-           <div className="flex gap-5">
-              <div className="p-3 bg-emerald-500/10 rounded-xl h-fit border border-emerald-500/20"><CheckCircle2 className="w-5 h-5 text-emerald-500" /></div>
-              <p className="text-sm text-slate-400 font-medium leading-relaxed italic">Mã Key có hiệu lực trong vòng 1500 giây (~25 phút) kể từ khi tạo link.</p>
-           </div>
-           <div className="flex gap-5">
-              <div className="p-3 bg-emerald-500/10 rounded-xl h-fit border border-emerald-500/20"><CheckCircle2 className="w-5 h-5 text-emerald-500" /></div>
-              <p className="text-sm text-slate-400 font-medium leading-relaxed italic">Không sử dụng VPN, trình chặn quảng cáo hoặc tab ẩn danh khi vượt link.</p>
-           </div>
         </div>
       </div>
     </div>

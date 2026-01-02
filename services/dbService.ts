@@ -36,43 +36,72 @@ const mapUser = (u: any): User => {
     joinDate: u.join_date,
     lastTaskDate: u.last_task_date,
     taskCounts: u.task_counts || {},
-    avatarUrl: u.avatar_url || ''
+    avatarUrl: u.avatar_url || '',
+    fullname: u.fullname || '',
+    email: u.email || '',
+    balance: Number(u.balance ?? 0),
+    referralCount: Number(u.referral_count ?? 0),
+    referralBonus: Number(u.referral_bonus ?? 0)
   };
 };
 
-const mapGiftcode = (g: any): Giftcode => ({
-  code: g.code,
-  amount: Number(g.amount),
-  maxUses: Number(g.max_uses),
-  usedBy: Array.isArray(g.used_by) ? g.used_by : [],
-  createdAt: g.created_at,
-  isActive: Boolean(g.is_active)
-});
-
-const mapAd = (ad: any): AdBanner => ({
-  id: ad.id,
-  title: ad.title,
-  imageUrl: ad.image_url,
-  targetUrl: ad.target_url,
-  isActive: Boolean(ad.is_active)
-});
-
-const mapAnnouncement = (ann: any): Announcement => ({
-  id: ann.id,
-  title: ann.title,
-  content: ann.content,
-  createdAt: ann.created_at,
-  priority: ann.priority,
-  isActive: Boolean(ann.is_active)
-});
-
 export const dbService = {
   login: async (email: string, pass: string) => {
-    const { data, error } = await supabase.from('users_data').select('*').eq('email', email).eq('password_hash', btoa(pass)).maybeSingle();
-    if (error || !data) return null;
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPass = pass.trim();
+    const { data, error } = await supabase.from('users_data').select('*').eq('email', cleanEmail).eq('password', cleanPass).maybeSingle();
+    if (error || !data) return { success: false, message: 'Sai email hoặc mật khẩu.' };
     localStorage.setItem('nova_session_id', data.id);
-    return mapUser(data);
+    return { success: true, user: mapUser(data) };
   },
+
+  register: async (fullname: string, email: string, pass: string, refBy?: string) => {
+    const cleanFullname = fullname.trim().toUpperCase();
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPass = pass.trim();
+    const { data: existing } = await supabase.from('users_data').select('id').eq('email', cleanEmail).maybeSingle();
+    if (existing) return { success: false, message: 'Email này đã được đăng ký.' };
+
+    const newUser = {
+      fullname: cleanFullname,
+      email: cleanEmail,
+      password: cleanPass,
+      balance: 0,
+      total_earned: 0,
+      tasks_today: 0,
+      tasks_week: 0,
+      is_banned: false,
+      is_admin: false,
+      join_date: new Date().toISOString(),
+      referred_by: refBy
+    };
+
+    const { data, error } = await supabase.from('users_data').insert([newUser]).select().single();
+    if (error) return { success: false, message: error.message };
+    localStorage.setItem('nova_session_id', data.id);
+    return { success: true, user: mapUser(data) };
+  },
+
+  requestPasswordReset: async (email: string) => {
+    const cleanEmail = email.trim().toLowerCase();
+    const { data } = await supabase.from('users_data').select('id').eq('email', cleanEmail).maybeSingle();
+    if (!data) return { success: false, message: 'Email không tồn tại trong hệ thống.' };
+    // Giả lập gửi mã xác nhận qua Bot
+    return { success: true, message: 'Yêu cầu thành công! Vui lòng lấy mã 6 số từ Telegram Bot.' };
+  },
+
+  resetPasswordWithCode: async (email: string, code: string, newPass: string) => {
+    const cleanEmail = email.trim().toLowerCase();
+    // Logic thực tế cần kiểm tra mã code lưu trong bảng reset_codes
+    // Ở đây giả lập chấp nhận mọi mã 6 số cho demo hoặc cần tích hợp API Bot
+    if (code.length !== 6) return { success: false, message: 'Mã xác nhận phải gồm 6 chữ số.' };
+    
+    const { error } = await supabase.from('users_data').update({ password: newPass.trim() }).eq('email', cleanEmail);
+    if (error) return { success: false, message: 'Không thể cập nhật mật khẩu.' };
+    return { success: true, message: 'Mật khẩu đã được thay đổi thành công!' };
+  },
+
+  logout: () => { localStorage.removeItem('nova_session_id'); },
 
   getCurrentUser: async () => {
     const id = localStorage.getItem('nova_session_id');
@@ -81,137 +110,75 @@ export const dbService = {
     return (error || !data) ? null : mapUser(data);
   },
 
-  logout: () => localStorage.removeItem('nova_session_id'),
-
   updateUser: async (userId: string, updates: Partial<any>) => {
     const { error } = await supabase.from('users_data').update(updates).eq('id', userId);
     return { success: !error, message: error ? error.message : 'Cập nhật thành công.' };
   },
 
-  adjustBalance: async (userId: string, amount: number) => {
-    const { data: u, error: fetchError } = await supabase.from('users_data').select('balance').eq('id', userId).single();
-    if (fetchError || !u) return { success: false, message: 'Không tìm thấy người dùng.' };
+  getVipRequests: async (userId: string) => {
+    const { data } = await supabase.from('vip_requests').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+    return data || [];
+  },
+
+  createVipDepositRequest: async (req: any) => {
+    const { error } = await supabase.from('vip_requests').insert([{
+      user_id: req.userId,
+      user_name: req.userName,
+      email: req.email.trim().toLowerCase(),
+      vip_tier: req.vipTier,
+      amount_vnd: req.amountVnd,
+      bank_details: req.bankDetails,
+      transfer_content: req.transferContent,
+      bill_url: req.billUrl,
+      status: 'pending'
+    }]);
+    return { success: !error, message: error ? error.message : 'Gửi yêu cầu nạp VIP thành công. Vui lòng chờ Admin duyệt bill!' };
+  },
+
+  upgradeVipTiered: async (userId: string, vndAmount: number) => {
+    const points = vndAmount * RATE_VND_TO_POINT;
+    const { data: u } = await supabase.from('users_data').select('balance').eq('id', userId).single();
+    if (!u || u.balance < points) return { success: false, message: 'Số dư không đủ.' };
     
-    const newBalance = Math.max(0, Number(u.balance || 0) + amount);
-    const { error: updateError } = await supabase.from('users_data').update({ balance: newBalance }).eq('id', userId);
+    let days = 1;
+    let tier = VipTier.BASIC;
+    if (vndAmount >= 500000) { days = 30; tier = VipTier.ELITE; }
+    else if (vndAmount >= 100000) { days = 7; tier = VipTier.PRO; }
     
-    return { success: !updateError, message: updateError ? updateError.message : 'Đã thay đổi số dư.' };
-  },
-
-  deleteUser: async (userId: string) => {
-    try {
-      await supabase.from('withdrawals').delete().eq('user_id', userId);
-      await supabase.from('notifications').delete().eq('user_id', userId);
-      const { error } = await supabase.from('users_data').delete().eq('id', userId);
-      if (error) throw error;
-      return { success: true, message: 'Đã xóa người dùng và toàn bộ dữ liệu liên quan.' };
-    } catch (err: any) {
-      return { success: false, message: 'Lỗi xóa: ' + err.message };
-    }
-  },
-
-  signup: async (email: string, pass: string, name: string, refCode?: string) => {
-    const { data: existing } = await supabase.from('users_data').select('id').eq('email', email).maybeSingle();
-    if (existing) return { success: false, message: 'Email đã được sử dụng.' };
-
-    const newUser = {
-      email,
-      password_hash: btoa(pass),
-      fullname: name,
-      balance: 0,
-      total_earned: 0,
-      tasks_today: 0,
-      tasks_week: 0,
-      join_date: new Date().toISOString(),
-      is_admin: false,
-      is_banned: false,
-      referred_by: refCode || null,
-    };
-
-    const { error } = await supabase.from('users_data').insert([newUser]);
-    if (error) return { success: false, message: error.message };
-    return { success: true };
-  },
-
-  addPointsSecurely: async (userId: string, timeElapsed: number, points: number, gateName: string) => {
-    if (timeElapsed < 5) {
-      await supabase.from('users_data').update({ is_banned: true, ban_reason: 'SENTINEL: Cheat tốc độ.' }).eq('id', userId);
-      return { error: 'SENTINEL_SECURITY_VIOLATION' };
-    }
-    const { data: u } = await supabase.from('users_data').select('*').eq('id', userId).single();
-    if (!u) return { error: 'USER_NOT_FOUND' };
-
-    const isVip = u.vip_until && new Date(u.vip_until) > new Date();
-    const finalPoints = isVip ? Math.floor(points * 1.5) : points;
-    const taskCounts = u.task_counts || {};
-    taskCounts[gateName] = (taskCounts[gateName] || 0) + 1;
-
-    await supabase.from('users_data').update({
-      balance: Number(u.balance || 0) + finalPoints,
-      total_earned: Number(u.total_earned || 0) + finalPoints,
-      tasks_today: Number(u.tasks_today || 0) + 1,
-      last_task_date: new Date().toISOString(),
-      task_counts: taskCounts
+    const until = new Date();
+    until.setDate(until.getDate() + days);
+    
+    const { error } = await supabase.from('users_data').update({
+      balance: u.balance - points,
+      vip_tier: tier,
+      vip_until: until.toISOString()
     }).eq('id', userId);
-    return { error: null };
+    
+    return { success: !error, message: error ? error.message : 'Nâng cấp VIP thành công!' };
+  },
+
+  getAnnouncements: async (includeInactive = false) => {
+    let q = supabase.from('announcements').select('*').order('created_at', { ascending: false });
+    if (!includeInactive) q = q.eq('is_active', true);
+    const { data } = await q;
+    return data || [];
+  },
+
+  getAds: async (includeInactive = false) => {
+    let q = supabase.from('ads').select('*');
+    if (!includeInactive) q = q.eq('is_active', true);
+    const { data } = await q;
+    return data || [];
+  },
+
+  getNotifications: async (userId: string) => {
+    const { data } = await supabase.from('notifications').select('*').or(`user_id.eq.${userId},user_id.eq.all`).order('created_at', { ascending: false });
+    return data || [];
   },
 
   getAllUsers: async () => {
-    const { data } = await supabase.from('users_data').select('*').order('balance', { ascending: false });
+    const { data } = await supabase.from('users_data').select('*');
     return (data || []).map(mapUser);
-  },
-
-  getTotalUserCount: async () => {
-    const { count } = await supabase.from('users_data').select('*', { count: 'exact', head: true });
-    return count || 0;
-  },
-
-  getAds: async (all = false) => {
-    let q = supabase.from('ads').select('*');
-    if (!all) q = q.eq('is_active', true);
-    const { data } = await q.order('created_at', { ascending: false });
-    return (data || []).map(mapAd);
-  },
-
-  saveAd: async (ad: any) => {
-    return await supabase.from('ads').insert([{ 
-      title: ad.title, 
-      image_url: ad.imageUrl, 
-      target_url: ad.targetUrl, 
-      is_active: true 
-    }]);
-  },
-
-  deleteAd: async (id: string) => {
-    return await supabase.from('ads').delete().eq('id', id);
-  },
-
-  updateAdStatus: async (id: string, active: boolean) => {
-    return await supabase.from('ads').update({ is_active: active }).eq('id', id);
-  },
-
-  getAnnouncements: async (all = false) => {
-    let q = supabase.from('announcements').select('*');
-    if (!all) q = q.eq('is_active', true);
-    const { data } = await q.order('created_at', { ascending: false });
-    return (data || []).map(mapAnnouncement);
-  },
-
-  saveAnnouncement: async (ann: any) => {
-    return await supabase.from('announcements').insert([{
-      title: ann.title,
-      content: ann.content,
-      priority: ann.priority || 'low',
-      is_active: true
-    }]);
-  },
-
-  deleteAnnouncement: async (id: string) => {
-    return await supabase.from('announcements').delete().eq('id', id);
-  },
-
-  updateAnnouncementStatus: async (id: string, active: boolean) => {
-    return await supabase.from('announcements').update({ is_active: active }).eq('id', id);
   },
 
   getWithdrawals: async (userId?: string) => {
@@ -221,123 +188,155 @@ export const dbService = {
     return data || [];
   },
 
+  getGiftcodes: async () => {
+    const { data } = await supabase.from('giftcodes').select('*').order('created_at', { ascending: false });
+    return data || [];
+  },
+
+  addPointsSecurely: async (userId: string, timeElapsed: number, points: number, gateName: string) => {
+    if (timeElapsed < 15) return { error: 'SENTINEL_SECURITY_VIOLATION' };
+    const { data: u } = await supabase.from('users_data').select('balance, total_earned, tasks_today, tasks_week, task_counts').eq('id', userId).single();
+    if (!u) return { error: 'User not found' };
+    const newCounts = { ...(u.task_counts || {}) };
+    newCounts[gateName] = (newCounts[gateName] || 0) + 1;
+    const { error } = await supabase.from('users_data').update({
+      balance: u.balance + points,
+      total_earned: u.total_earned + points,
+      tasks_today: u.tasks_today + 1,
+      tasks_week: u.tasks_week + 1,
+      last_task_date: new Date().toISOString(),
+      task_counts: newCounts
+    }).eq('id', userId);
+    return { success: !error, error: error?.message };
+  },
+
+  addWithdrawal: async (req: any) => {
+    const pointsNeeded = req.amount * RATE_VND_TO_POINT;
+    const { data: u } = await supabase.from('users_data').select('balance').eq('id', req.userId).single();
+    if (!u || u.balance < pointsNeeded) return { error: 'Số dư không đủ để rút.' };
+    const { error: balanceError } = await supabase.from('users_data').update({ balance: u.balance - pointsNeeded }).eq('id', req.userId);
+    if (balanceError) return { error: balanceError.message };
+    const { error } = await supabase.from('withdrawals').insert([{
+      user_id: req.userId,
+      user_name: req.userName,
+      amount: req.amount,
+      type: req.type,
+      status: req.status,
+      details: req.details,
+      created_at: req.createdAt
+    }]);
+    return { success: !error, error: error?.message };
+  },
+
+  addNotification: async (notif: any) => {
+    const { error } = await supabase.from('notifications').insert([{
+      user_id: notif.userId || 'all',
+      user_name: notif.userName || 'System',
+      title: notif.title,
+      content: notif.content,
+      type: notif.type || 'system',
+      created_at: new Date().toISOString()
+    }]);
+    return { success: !error };
+  },
+
+  linkPhone: async (userId: string, phone: string) => {
+    const { error } = await supabase.from('users_data').update({ phone_number: phone.trim() }).eq('id', userId);
+    return { success: !error };
+  },
+
+  updatePassword: async (userId: string, oldPass: string, newPass: string) => {
+    const { data } = await supabase.from('users_data').select('password').eq('id', userId).single();
+    if (!data || data.password !== oldPass.trim()) return { success: false, message: 'Mật khẩu cũ không đúng.' };
+    const { error } = await supabase.from('users_data').update({ password: newPass.trim() }).eq('id', userId);
+    return { success: !error, message: error ? error.message : 'Đổi mật khẩu thành công.' };
+  },
+
+  claimGiftcode: async (userId: string, code: string) => {
+    const cleanCode = code.trim().toUpperCase();
+    const { data: gc } = await supabase.from('giftcodes').select('*').eq('code', cleanCode).maybeSingle();
+    if (!gc) return { success: false, message: 'Mã Giftcode không tồn tại.' };
+    if (!gc.is_active) return { success: false, message: 'Mã Giftcode đã hết hạn.' };
+    const usedBy = gc.used_by || [];
+    if (usedBy.includes(userId)) return { success: false, message: 'Bạn đã sử dụng mã này rồi.' };
+    if (usedBy.length >= gc.max_uses) return { success: false, message: 'Mã Giftcode đã hết lượt.' };
+    const { data: u } = await supabase.from('users_data').select('balance, total_giftcode_earned').eq('id', userId).single();
+    if (!u) return { success: false, message: 'Người dùng không tồn tại.' };
+    await supabase.from('giftcodes').update({ used_by: [...usedBy, userId] }).eq('code', cleanCode);
+    const { error } = await supabase.from('users_data').update({
+      balance: u.balance + gc.amount,
+      total_giftcode_earned: (u.total_giftcode_earned || 0) + gc.amount
+    }).eq('id', userId);
+    return { success: !error, amount: gc.amount, message: error ? error.message : `Bạn nhận được ${gc.amount} P!` };
+  },
+
+  adjustBalance: async (userId: string, amount: number) => {
+    const { data: u } = await supabase.from('users_data').select('balance').eq('id', userId).single();
+    if (!u) return { success: false, message: 'User not found' };
+    const { error } = await supabase.from('users_data').update({ balance: u.balance + amount }).eq('id', userId);
+    return { success: !error, message: error ? error.message : 'Cập nhật số dư thành công.' };
+  },
+
+  deleteUser: async (userId: string) => {
+    const { error } = await supabase.from('users_data').delete().eq('id', userId);
+    return { success: !error, message: error ? error.message : 'Xóa hội viên thành công.' };
+  },
+
   updateWithdrawalStatus: async (id: string, status: string) => {
-    return await supabase.from('withdrawals').update({ status }).eq('id', id);
+    const { error } = await supabase.from('withdrawals').update({ status }).eq('id', id);
+    return { success: !error };
   },
 
   addGiftcode: async (gc: any) => {
-    const codeUpper = gc.code.trim().toUpperCase();
-    const { data: existing } = await supabase.from('giftcodes').select('id').eq('code', codeUpper).maybeSingle();
-    if (existing) {
-      return { error: { message: `Mã [${codeUpper}] đã tồn tại. Vui lòng chọn tên khác.` } };
-    }
-    const { error } = await supabase.from('giftcodes').insert([{ 
-      code: codeUpper, 
-      amount: Number(gc.amount), 
-      max_uses: Number(gc.maxUses), 
-      used_by: [], 
-      is_active: true 
+    const { error } = await supabase.from('giftcodes').insert([{
+      code: gc.code.trim().toUpperCase(),
+      amount: gc.amount,
+      max_uses: gc.maxUses,
+      used_by: [],
+      created_at: new Date().toISOString(),
+      is_active: true
     }]);
     return { error };
   },
 
-  getGiftcodes: async () => {
-    const { data } = await supabase.from('giftcodes').select('*').order('created_at', { ascending: false });
-    return (data || []).map(mapGiftcode);
-  },
-
-  claimGiftcode: async (userId: string, code: string) => {
-    const { data: gc } = await supabase.from('giftcodes').select('*').eq('code', code.toUpperCase()).eq('is_active', true).maybeSingle();
-    if (!gc) return { success: false, message: 'Giftcode không tồn tại hoặc đã bị ẩn.' };
-    const usedBy = Array.isArray(gc.used_by) ? gc.used_by : [];
-    if (usedBy.includes(userId)) return { success: false, message: 'Bạn đã sử dụng mã này rồi.' };
-    if (usedBy.length >= Number(gc.max_uses)) return { success: false, message: 'Mã đã hết lượt dùng.' };
-    const { data: u } = await supabase.from('users_data').select('balance').eq('id', userId).single();
-    if (!u) return { success: false, message: 'Lỗi xác thực người dùng.' };
-    await supabase.from('users_data').update({ balance: Number(u.balance || 0) + Number(gc.amount) }).eq('id', userId);
-    await supabase.from('giftcodes').update({ used_by: [...usedBy, userId] }).eq('id', gc.id);
-    return { success: true, amount: gc.amount, message: 'Kích hoạt thành công!' };
-  },
-
-  getNotifications: async (userId: string) => {
-    const { data } = await supabase.from('notifications').select('*').or(`user_id.eq.${userId},user_id.eq.all`).order('created_at', { ascending: false });
-    return data || [];
-  },
-
-  addWithdrawal: async (w: any) => {
-    const { data: u } = await supabase.from('users_data').select('balance').eq('id', w.userId).single();
-    if (!u || u.balance < w.amount * RATE_VND_TO_POINT) return { error: 'Số dư không đủ.' };
-    const { error: wError } = await supabase.from('withdrawals').insert([{
-      user_id: w.userId,
-      user_name: w.userName,
-      amount: Number(w.amount),
-      type: w.type,
-      status: 'pending',
-      details: w.details,
-      created_at: new Date().toISOString()
+  saveAd: async (ad: any) => {
+    const { error } = await supabase.from('ads').insert([{
+      title: ad.title.trim(),
+      image_url: ad.imageUrl.trim(),
+      target_url: ad.targetUrl.trim(),
+      is_active: true
     }]);
-    if (wError) return { error: wError.message };
-    await supabase.from('users_data').update({ 
-      balance: Number(u.balance) - (Number(w.amount) * RATE_VND_TO_POINT) 
-    }).eq('id', w.userId);
-    return { error: null };
+    return { error };
   },
 
-  addNotification: async (n: any) => {
-    return await supabase.from('notifications').insert([{
-      user_id: n.userId,
-      user_name: n.userName,
-      title: n.title,
-      content: n.content,
-      type: n.type || 'system',
-      created_at: new Date().toISOString()
+  updateAdStatus: async (id: string, isActive: boolean) => {
+    const { error } = await supabase.from('ads').update({ is_active: isActive }).eq('id', id);
+    return { success: !error };
+  },
+
+  deleteAd: async (id: string) => {
+    const { error } = await supabase.from('ads').delete().eq('id', id);
+    return { success: !error };
+  },
+
+  saveAnnouncement: async (ann: any) => {
+    const { error } = await supabase.from('announcements').insert([{
+      title: ann.title.trim(),
+      content: ann.content.trim(),
+      priority: ann.priority,
+      created_at: new Date().toISOString(),
+      is_active: true
     }]);
+    return { error };
   },
 
-  linkPhone: async (userId: string, phone: string) => {
-    return await supabase.from('users_data').update({ phone_number: phone }).eq('id', userId);
+  updateAnnouncementStatus: async (id: string, isActive: boolean) => {
+    const { error } = await supabase.from('announcements').update({ is_active: isActive }).eq('id', id);
+    return { success: !error };
   },
 
-  updatePassword: async (userId: string, oldPass: string, newPass: string) => {
-    const { data } = await supabase.from('users_data').select('password_hash').eq('id', userId).single();
-    if (!data || data.password_hash !== btoa(oldPass)) return { success: false, message: 'Mật khẩu cũ không đúng.' };
-    const { error } = await supabase.from('users_data').update({ password_hash: btoa(newPass) }).eq('id', userId);
-    return { success: !error, message: error ? error.message : 'Đổi mật khẩu thành công.' };
-  },
-
-  requestResetCode: async (email: string, telegram: string) => {
-    const { data } = await supabase.from('users_data').select('id').eq('email', email).maybeSingle();
-    if (!data) return { success: false, message: 'Email không tồn tại.' };
-    return { success: true };
-  },
-
-  resetPassword: async (email: string, code: string, newPass: string) => {
-    if (!code || code.length !== 6) return { success: false, message: 'Mã xác thực không hợp lệ.' };
-    const { error } = await supabase.from('users_data').update({ password_hash: btoa(newPass) }).eq('email', email);
-    return { success: !error, message: error ? error.message : 'Khôi phục mật khẩu thành công.' };
-  },
-
-  getVipUsers: async () => {
-    const now = new Date().toISOString();
-    const { data } = await supabase.from('users_data').select('*').gt('vip_until', now).order('vip_until', { ascending: false });
-    return (data || []).map(mapUser);
-  },
-
-  upgradeVipTiered: async (userId: string, vndAmount: number) => {
-    const points = vndAmount * RATE_VND_TO_POINT;
-    const { data: u } = await supabase.from('users_data').select('balance').eq('id', userId).single();
-    if (!u || u.balance < points) return { success: false, message: 'Số dư không đủ.' };
-    let days = 1;
-    let tier = VipTier.BASIC;
-    if (vndAmount >= 500000) { days = 30; tier = VipTier.ELITE; }
-    else if (vndAmount >= 100000) { days = 7; tier = VipTier.PRO; }
-    const until = new Date();
-    until.setDate(until.getDate() + days);
-    const { error } = await supabase.from('users_data').update({
-      balance: u.balance - points,
-      vip_tier: tier,
-      vip_until: until.toISOString()
-    }).eq('id', userId);
-    return { success: !error, message: error ? error.message : 'Nâng cấp VIP thành công!' };
+  deleteAnnouncement: async (id: string) => {
+    const { error } = await supabase.from('announcements').delete().eq('id', id);
+    return { success: !error };
   }
 };

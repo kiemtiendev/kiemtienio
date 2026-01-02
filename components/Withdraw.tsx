@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, WithdrawalRequest } from '../types.ts';
-import { WITHDRAW_MILESTONES, RATE_VND_TO_POINT, formatK, DIAMOND_EXCHANGE } from '../constants.tsx';
+import { WITHDRAW_MILESTONES, RATE_VND_TO_POINT, formatK, DIAMOND_EXCHANGE, QUAN_HUY_EXCHANGE } from '../constants.tsx';
 import { dbService } from '../services/dbService.ts';
 import { Building2, Gamepad2, Wallet, CheckCircle, Loader2, History, ArrowRightLeft } from 'lucide-react';
 
@@ -38,13 +38,16 @@ const Withdraw: React.FC<Props> = ({ user, onUpdateUser, initialHistory = false 
     return DIAMOND_EXCHANGE[vnd] || 0;
   };
 
+  const getQuanHuyValue = (vnd: number) => {
+    return QUAN_HUY_EXCHANGE[vnd] || 0;
+  };
+
   const handleWithdraw = async () => {
     if (!method || !selectedMilestone || !canAfford) return;
     const info = method === 'bank' ? user.bankInfo : user.idGame;
-    if (!info) return alert(`Hãy cập nhật thông tin ${method === 'bank' ? 'ATM' : 'ID Game'} trong mục Hồ sơ.`);
+    if (!info) return alert(`Hãy cập nhật thông tin ${method === 'bank' ? 'ATM' : 'ID Game / Tên Game'} trong mục Hồ sơ.`);
     
     setIsProcessing(true);
-    // NOVA FIX: Chỉ gọi addWithdrawal, DB sẽ tự trừ tiền và App.tsx sẽ tự load lại User qua Real-time
     const res = await dbService.addWithdrawal({
       userId: user.id,
       userName: `${user.fullname} (${user.email})`,
@@ -98,7 +101,7 @@ const Withdraw: React.FC<Props> = ({ user, onUpdateUser, initialHistory = false 
                       <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest bg-blue-500/10 px-2 py-0.5 rounded">ID: #{req.id}</span>
                     </div>
                     <h4 className="font-black text-xl text-white uppercase italic tracking-tight">
-                      {req.type === 'bank' ? `${req.amount.toLocaleString()}đ` : `${getGameDiamondValue(req.amount).toLocaleString()} KC`}
+                      {req.type === 'bank' ? `${req.amount.toLocaleString()}đ` : `THƯỞNG GAME (${req.amount.toLocaleString()}đ)`}
                     </h4>
                     <span className="text-[10px] text-slate-500 font-black uppercase tracking-widest">{new Date(req.createdAt).toLocaleString('vi-VN')}</span>
                   </div>
@@ -136,8 +139,8 @@ const Withdraw: React.FC<Props> = ({ user, onUpdateUser, initialHistory = false 
         </button>
         <button onClick={() => { setMethod('game'); setSelectedMilestone(null); }} className={`glass-card p-12 rounded-[3.5rem] border-4 transition-all shadow-xl flex flex-col items-center text-center gap-4 group ${method === 'game' ? 'border-purple-500 bg-purple-500/10' : 'border-transparent hover:border-slate-800'}`}>
           <div className="p-6 bg-purple-600/10 rounded-3xl group-hover:scale-110 transition-transform"><Gamepad2 className="w-12 h-12 text-purple-400" /></div>
-          <h3 className="text-3xl font-black text-white uppercase italic tracking-tighter">Kim Cương FF</h3>
-          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest italic">Nạp trực tiếp qua ID Game</p>
+          <h3 className="text-3xl font-black text-white uppercase italic tracking-tighter">Rút Thưởng Game</h3>
+          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest italic">Nhận Quân Huy - Kim Cương Miễn Phí 100%</p>
         </button>
       </div>
 
@@ -148,7 +151,7 @@ const Withdraw: React.FC<Props> = ({ user, onUpdateUser, initialHistory = false 
             <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent w-full"></div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
             {WITHDRAW_MILESTONES.map(val => {
               const pts = val * RATE_VND_TO_POINT;
               const isSelected = selectedMilestone === val;
@@ -158,14 +161,30 @@ const Withdraw: React.FC<Props> = ({ user, onUpdateUser, initialHistory = false 
                   key={val} 
                   disabled={isLow} 
                   onClick={() => setSelectedMilestone(val)} 
-                  className={`p-8 rounded-[2rem] border-2 transition-all flex flex-col items-center gap-2 shadow-lg active:scale-95 group relative overflow-hidden ${isSelected ? 'border-emerald-500 bg-emerald-500/10' : 'border-slate-800 bg-slate-950/50 hover:border-slate-700'} ${isLow ? 'opacity-20 grayscale cursor-not-allowed' : ''}`}
+                  className={`p-6 rounded-[2rem] border-2 transition-all flex flex-col items-center gap-3 shadow-lg active:scale-95 group relative overflow-hidden ${isSelected ? 'border-emerald-500 bg-emerald-500/10' : 'border-slate-800 bg-slate-950/50 hover:border-slate-700'} ${isLow ? 'opacity-20 grayscale cursor-not-allowed' : ''}`}
                 >
-                  <span className={`text-2xl font-black italic tracking-tighter transition-colors ${isSelected ? 'text-emerald-400' : 'text-white'}`}>
-                    {method === 'game' ? `${getGameDiamondValue(val).toLocaleString()} KC` : `${(val/1000).toLocaleString()}kđ`}
-                  </span>
-                  <span className="text-[10px] text-slate-500 font-black uppercase italic tracking-widest group-hover:text-slate-400 transition-colors">
-                    {formatK(pts)} P
-                  </span>
+                  <div className="text-center space-y-1">
+                    {method === 'game' ? (
+                      <>
+                        <div className={`text-xl font-black italic tracking-tighter transition-colors ${isSelected ? 'text-emerald-400' : 'text-white'}`}>
+                          {getQuanHuyValue(val).toLocaleString()} Quân Huy
+                        </div>
+                        <div className="text-xs font-black text-blue-400 italic">
+                          hoặc {getGameDiamondValue(val).toLocaleString()} Kim Cương
+                        </div>
+                      </>
+                    ) : (
+                      <span className={`text-2xl font-black italic tracking-tighter transition-colors ${isSelected ? 'text-emerald-400' : 'text-white'}`}>
+                        {(val/1000).toLocaleString()}kđ
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-slate-500 font-black uppercase italic tracking-widest group-hover:text-slate-400 transition-colors">
+                      {formatK(pts)} P
+                    </span>
+                    <span className="text-[9px] text-slate-600 font-bold">~ {(val).toLocaleString()}đ</span>
+                  </div>
                   {isSelected && <div className="absolute top-2 right-2 w-2 h-2 bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,1)] animate-pulse"></div>}
                 </button>
               );
@@ -205,7 +224,7 @@ const Withdraw: React.FC<Props> = ({ user, onUpdateUser, initialHistory = false 
                  <CheckCircle className="w-10 h-10 text-emerald-500" />
               </div>
               <h2 className="text-3xl font-black text-white uppercase italic mb-4">THÀNH CÔNG!</h2>
-              <p className="text-slate-400 font-medium italic mb-4">Yêu cầu rút {method === 'game' ? `${getGameDiamondValue(selectedMilestone || 0).toLocaleString()} KC` : `${(selectedMilestone || 0).toLocaleString()}đ`} đã được gửi. Vui lòng đợi 5-30 phút.</p>
+              <p className="text-slate-400 font-medium italic mb-4">Yêu cầu rút thưởng game đã được gửi. Quà tặng Quân Huy / Kim Cương sẽ được gửi vào ID Game của bạn trong 5-30 phút.</p>
               <button onClick={() => setIsSuccess(false)} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-5 rounded-2xl uppercase tracking-widest italic transition-all">OK, TÔI ĐÃ HIỂU</button>
            </div>
         </div>

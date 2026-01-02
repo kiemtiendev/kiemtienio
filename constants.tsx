@@ -17,42 +17,48 @@ import {
 } from 'lucide-react';
 import { AppView, TaskGate } from './types.ts';
 
-// @ts-ignore
-export const ADMIN_ID = process.env.ADMIN_ID || process.env.VITE_ADMIN_ID || "7790668848";
-export const EXCHANGE_RATE = 22000;
-export const POINT_EXCHANGE = 10;
+export const ADMIN_ID = "7790668848";
 export const RATE_VND_TO_POINT = 10;
-export const POINT_PER_DIAMOND = 2000; 
 export const REFERRAL_REWARD = 5000;
 export const DAILY_TASK_LIMIT = 20;
 export const VIP_TASK_LIMIT = 35;
-export const VIP_PRICE = 50000; // 50k P
 
-export const SECURE_AUTH_KEY = "MA_BAO_MAT_CUA_ADMIN";
+export const BLOG_DESTINATION = "https://diamondnova-rewards.blogspot.com/verify";
+export const SOCIAL_LINKS = {
+  facebook: "https://facebook.com/diamondnova",
+  telegram: "https://t.me/VanhTRUM",
+  youtube: "https://youtube.com/@diamondnova"
+};
 
-export const WITHDRAW_MILESTONES = [5000, 10000, 20000, 50000, 100000, 200000, 500000, 1000000, 2000000];
-
+export const WITHDRAW_MILESTONES = [5000, 10000, 20000, 50000, 100000, 200000, 500000];
 export const DIAMOND_EXCHANGE: Record<number, number> = {
   5000: 25,
-  10000: 51,
-  20000: 113,
-  50000: 283,
-  100000: 566,
-  200000: 1132,
-  500000: 2830,
-  1000000: 5750,
-  2000000: 11500
+  10000: 55,
+  20000: 115,
+  50000: 285,
+  100000: 600,
+  200000: 1250,
+  500000: 3200
+};
+export const QUAN_HUY_EXCHANGE: Record<number, number> = {
+  5000: 10,
+  10000: 20,
+  20000: 42,
+  50000: 108,
+  100000: 220,
+  200000: 450,
+  500000: 1150
 };
 
-export const BLOG_DESTINATION = "https://avudev-verifi.blogspot.com/";
+export const ADMIN_BANKS = [
+  { bank: "MBBANK", account: "0337117930", owner: "HOANG MAI ANH VU" },
+  { bank: "MBV", account: "9612345678", owner: "HOANG MAI ANH VU" },
+  { bank: "VIETINBANK", account: "103885892927", owner: "HOANG MAI ANH VU" },
+  { bank: "TPBANK", account: "55000123789", owner: "HOANG MAI ANH VU" }
+];
 
-export const SOCIAL_LINKS = {
-  YOUTUBE: "https://youtube.com/@itachiwa_01?si=xL-3vNdye1dFF-v7",
-  TELEGRAM_GROUP: "https://t.me/+JzOTfYqCwAU4MzE1",
-  TELEGRAM_ADMIN: "https://t.me/VanhTRUM",
-  ZALO_ADMIN: "https://zalo.me/0337117930",
-  FANPAGE: "beacons.ai/vanhtrumvn"
-};
+export const SLOGAN = "HỆ THỐNG NHIỆM VỤ - KIẾM TIỀN - Nhận Thẻ Game Quân Huy - Kim Cương Miễn Phí";
+export const COPYRIGHT = "Bản quyền bởi DIAMOND NOVA";
 
 export const TASK_RATES: Record<number, { name: string, reward: number, limit: number, apiKey: string }> = {
   1: { name: "LINK4M", reward: 1320, limit: 2, apiKey: "68208afab6b8fc60542289b6" },
@@ -63,28 +69,11 @@ export const TASK_RATES: Record<number, { name: string, reward: number, limit: n
   6: { name: "LAYMANET", reward: 1320, limit: 3, apiKey: "ad22fab4209242db6c1bc093898fe2e8" }
 };
 
-export const TASK_GATES: (TaskGate & { id: number })[] = Object.entries(TASK_RATES).map(([id, data]) => ({
-  id: parseInt(id),
-  name: data.name,
-  rate: data.reward,
-  quota: data.limit,
-  apiKey: data.apiKey
-}));
-
-export const formatK = (num: number | undefined | null): string => {
-  if (num === undefined || num === null || num === 0) return "0";
-  const absNum = Math.abs(num);
-  if (absNum >= 1000000000) return (num / 1000000000).toFixed(1).replace(/\.0$/, '') + 'B';
-  if (absNum >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
-  if (absNum >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
-  return num.toString();
-};
-
 export const NAV_ITEMS = [
   { id: AppView.DASHBOARD, label: 'Trang chủ', icon: <LayoutDashboard /> },
   { id: AppView.VIP, label: 'Nâng cấp VIP', icon: <Crown className="text-amber-400" /> },
-  { id: AppView.TASKS, label: 'Khai thác điểm', icon: <Coins /> },
-  { id: AppView.WITHDRAW, label: 'Rút Thưởng', icon: <CreditCard /> },
+  { id: AppView.TASKS, label: 'Nhiệm vụ', icon: <Coins /> },
+  { id: AppView.WITHDRAW, label: 'Rút Thưởng Game', icon: <CreditCard /> },
   { id: AppView.HISTORY, label: 'Lịch sử rút', icon: <History /> },
   { id: AppView.SUPPORT, label: 'Trợ lý AI Gemini', icon: <Bot /> },
   { id: AppView.NOTIFICATIONS, label: 'Thông báo', icon: <Bell /> },
@@ -95,3 +84,11 @@ export const NAV_ITEMS = [
   { id: AppView.PROFILE, label: 'Tài Khoản', icon: <User /> },
   { id: AppView.ADMIN, label: 'Hệ Thống', icon: <Cloud />, adminOnly: true },
 ];
+
+export const formatK = (num: number | undefined | null): string => {
+  if (num === undefined || num === null || num === 0) return "0";
+  const absNum = Math.abs(num);
+  if (absNum >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (absNum >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+  return num.toString();
+};
