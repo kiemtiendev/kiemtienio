@@ -197,6 +197,23 @@ export const dbService = {
     return (data || []).map(mapAnnouncement);
   },
 
+  saveAnnouncement: async (ann: any) => {
+    return await supabase.from('announcements').insert([{
+      title: ann.title,
+      content: ann.content,
+      priority: ann.priority || 'low',
+      is_active: true
+    }]);
+  },
+
+  deleteAnnouncement: async (id: string) => {
+    return await supabase.from('announcements').delete().eq('id', id);
+  },
+
+  updateAnnouncementStatus: async (id: string, active: boolean) => {
+    return await supabase.from('announcements').update({ is_active: active }).eq('id', id);
+  },
+
   getWithdrawals: async (userId?: string) => {
     let q = supabase.from('withdrawals').select('*').order('created_at', { ascending: false });
     if (userId) q = q.eq('user_id', userId);

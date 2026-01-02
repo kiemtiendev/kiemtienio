@@ -1,13 +1,13 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { User, WithdrawalRequest, Giftcode, AdBanner } from '../types.ts';
+import { User, WithdrawalRequest, Giftcode, AdBanner, Announcement } from '../types.ts';
 import { dbService, supabase } from '../services/dbService.ts';
 import { formatK, RATE_VND_TO_POINT } from '../constants.tsx';
 import { 
   Users, CreditCard, Ticket, Megaphone, ImageIcon, Eye, EyeOff, Trash2, 
   PlusCircle, Search, CheckCircle2, XCircle, Settings, UserMinus, 
   UserPlus, ShieldAlert, Ban, Unlock, Wallet, Activity, TrendingUp, DollarSign,
-  RefreshCcw, UserX
+  RefreshCcw, UserX, AlertTriangle
 } from 'lucide-react';
 
 interface AdminProps {
@@ -16,32 +16,38 @@ interface AdminProps {
 }
 
 export default function Admin({ user, onUpdateUser }: AdminProps) {
-  const [tab, setTab] = useState<'users' | 'withdrawals' | 'ads' | 'giftcodes'>('users');
+  const [tab, setTab] = useState<'users' | 'withdrawals' | 'ads' | 'giftcodes' | 'announcements'>('users');
   const [users, setUsers] = useState<User[]>([]);
   const [withdrawals, setWithdrawals] = useState<any[]>([]);
   const [ads, setAds] = useState<AdBanner[]>([]);
   const [giftcodes, setGiftcodes] = useState<Giftcode[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   
   const [showAddGc, setShowAddGc] = useState(false);
   const [showAddAd, setShowAddAd] = useState(false);
+  const [showAddAnn, setShowAddAnn] = useState(false);
+  
   const [newGc, setNewGc] = useState({ code: '', amount: 10000, maxUses: 100 });
   const [newAd, setNewAd] = useState({ title: '', imageUrl: '', targetUrl: '' });
+  const [newAnn, setNewAnn] = useState({ title: '', content: '', priority: 'low' as 'low' | 'high' });
   
   const [activeUserMenu, setActiveUserMenu] = useState<string | null>(null);
   const [searchUser, setSearchUser] = useState('');
 
   const refreshData = async () => {
     try {
-      const [u, w, a, g] = await Promise.all([
+      const [u, w, a, g, ann] = await Promise.all([
         dbService.getAllUsers(),
         dbService.getWithdrawals(),
         dbService.getAds(true), 
-        dbService.getGiftcodes()
+        dbService.getGiftcodes(),
+        dbService.getAnnouncements(true)
       ]);
       setUsers(u);
       setWithdrawals(w);
       setAds(a);
       setGiftcodes(g);
+      setAnnouncements(ann);
     } catch (err) {
       console.error("Lỗi tải dữ liệu admin:", err);
     }
@@ -50,12 +56,13 @@ export default function Admin({ user, onUpdateUser }: AdminProps) {
   useEffect(() => {
     refreshData();
 
-    // REAL-TIME SYNC (Dự phòng)
+    // REAL-TIME SYNC
     const channels = [
       supabase.channel('admin-users-sync').on('postgres_changes', { event: '*', schema: 'public', table: 'users_data' }, () => { refreshData(); }).subscribe(),
       supabase.channel('admin-withdraw-sync').on('postgres_changes', { event: '*', schema: 'public', table: 'withdrawals' }, () => { refreshData(); }).subscribe(),
       supabase.channel('admin-ads-sync').on('postgres_changes', { event: '*', schema: 'public', table: 'ads' }, () => { refreshData(); }).subscribe(),
-      supabase.channel('admin-gc-sync').on('postgres_changes', { event: '*', schema: 'public', table: 'giftcodes' }, () => { refreshData(); }).subscribe()
+      supabase.channel('admin-gc-sync').on('postgres_changes', { event: '*', schema: 'public', table: 'giftcodes' }, () => { refreshData(); }).subscribe(),
+      supabase.channel('admin-ann-sync').on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => { refreshData(); }).subscribe()
     ];
 
     return () => {
@@ -140,7 +147,6 @@ export default function Admin({ user, onUpdateUser }: AdminProps) {
       alert("Đã tạo Giftcode mới!");
       setShowAddGc(false);
       setNewGc({ code: '', amount: 10000, maxUses: 100 });
-      // QUAN TRỌNG: Gọi refreshData để hiện code mới ngay lập tức
       refreshData();
     }
   };
@@ -154,7 +160,19 @@ export default function Admin({ user, onUpdateUser }: AdminProps) {
       alert("Đã tạo Quảng cáo mới!");
       setShowAddAd(false);
       setNewAd({ title: '', imageUrl: '', targetUrl: '' });
-      // QUAN TRỌNG: Gọi refreshData để hiện quảng cáo mới ngay lập tức
+      refreshData();
+    }
+  };
+
+  const handleCreateAnnouncement = async () => {
+    if (!newAnn.title || !newAnn.content) return alert("Vui lòng nhập đủ thông tin.");
+    const res = await dbService.saveAnnouncement(newAnn);
+    if (res.error) {
+      alert("Lỗi: " + res.error.message);
+    } else {
+      alert("Đã đăng thông báo mới!");
+      setShowAddAnn(false);
+      setNewAnn({ title: '', content: '', priority: 'low' });
       refreshData();
     }
   };
@@ -196,7 +214,8 @@ export default function Admin({ user, onUpdateUser }: AdminProps) {
           { id: 'users', label: 'Hội viên', icon: <Users size={14} /> },
           { id: 'withdrawals', label: 'Rút tiền', icon: <CreditCard size={14} /> },
           { id: 'ads', label: 'Quảng cáo', icon: <ImageIcon size={14} /> },
-          { id: 'giftcodes', label: 'Giftcodes', icon: <Ticket size={14} /> }
+          { id: 'giftcodes', label: 'Giftcodes', icon: <Ticket size={14} /> },
+          { id: 'announcements', label: 'Thông báo', icon: <Megaphone size={14} /> }
         ].map(i => (
           <button key={i.id} onClick={() => setTab(i.id as any)} className={`flex items-center gap-2 px-6 py-3 rounded-xl font-black text-[10px] uppercase italic transition-all ${tab === i.id ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-900 text-slate-500 hover:bg-slate-800'}`}>
             {i.icon} {i.label}
@@ -267,7 +286,7 @@ export default function Admin({ user, onUpdateUser }: AdminProps) {
                              </button>
                              <div className="h-px bg-white/5 my-2"></div>
                              <button onClick={() => handleDeleteUser(u.id)} className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-red-600 hover:text-white text-left text-slate-500 font-bold transition-all">
-                                <UserX size={14} /> <span>XÓA VĨNH VIỄN</span>
+                                <UserX size={14} /> <span>XÓA VĨNH VIÊNN</span>
                              </button>
                           </div>
                         )}
@@ -420,9 +439,93 @@ export default function Admin({ user, onUpdateUser }: AdminProps) {
             </div>
           </div>
         )}
+
+        {tab === 'announcements' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h3 className="text-xl font-black text-white italic uppercase tracking-tighter">THÔNG BÁO HỆ THỐNG</h3>
+              <button onClick={() => setShowAddAnn(true)} className="px-8 py-4 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase italic tracking-widest shadow-xl flex items-center gap-3 active:scale-95 transition-all">
+                 <PlusCircle size={16} /> ĐĂNG TIN MỚI
+              </button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="text-[10px] font-black text-slate-500 uppercase italic border-b border-white/5">
+                  <tr>
+                    <th className="px-4 py-4">Mức Độ</th>
+                    <th className="px-4 py-4">Tiêu Đề</th>
+                    <th className="px-4 py-4">Nội Dung</th>
+                    <th className="px-4 py-4">Trạng Thái</th>
+                    <th className="px-4 py-4 text-right">Hành Động</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {announcements.map(ann => (
+                    <tr key={ann.id} className="text-xs group hover:bg-white/[0.02]">
+                      <td className="px-4 py-4">
+                        <span className={`px-2 py-1 rounded text-[8px] font-black uppercase italic ${ann.priority === 'high' ? 'bg-red-500/20 text-red-500 animate-pulse' : 'bg-blue-500/20 text-blue-500'}`}>
+                          {ann.priority === 'high' ? 'KHẨN CẤP' : 'THƯỜNG'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 font-black text-white uppercase">{ann.title}</td>
+                      <td className="px-4 py-4 text-slate-500 italic truncate max-w-[200px]">{ann.content}</td>
+                      <td className="px-4 py-4">
+                        <span className={`px-2 py-1 rounded text-[9px] font-black italic ${ann.isActive ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
+                          {ann.isActive ? 'ĐANG HIỆN' : 'ĐÃ ẨN'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 text-right">
+                        <div className="flex justify-end gap-2">
+                           <button onClick={() => dbService.updateAnnouncementStatus(ann.id, !ann.isActive).then(refreshData)} className={`p-2 rounded-lg transition-all ${ann.isActive ? 'bg-slate-800 text-slate-400' : 'bg-emerald-600 text-white'}`}>
+                              {ann.isActive ? <EyeOff size={16} /> : <Eye size={16} />}
+                           </button>
+                           <button onClick={() => dbService.deleteAnnouncement(ann.id).then(refreshData)} className="p-2 bg-red-600/10 text-red-500 rounded-lg hover:bg-red-600 hover:text-white">
+                              <Trash2 size={16} />
+                           </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Modal Giftcode */}
+      {/* Modals remains here... (Giftcode, Ads) */}
+
+      {/* Modal Announcement */}
+      {showAddAnn && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
+           <div className="glass-card w-full max-w-md p-10 rounded-[2.5rem] border border-white/10 space-y-6 animate-in zoom-in-95">
+              <h2 className="text-2xl font-black text-white italic uppercase tracking-tighter">ĐĂNG THÔNG BÁO MỚI</h2>
+              <div className="space-y-4">
+                 <div className="space-y-2">
+                    <label className="text-[9px] font-black text-slate-500 uppercase italic">Mức độ ưu tiên</label>
+                    <div className="flex gap-2">
+                       <button onClick={() => setNewAnn({...newAnn, priority: 'low'})} className={`flex-1 py-2 rounded-xl border text-[9px] font-black transition-all ${newAnn.priority === 'low' ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-900 text-slate-500 border-white/5'}`}>THƯỜNG</button>
+                       <button onClick={() => setNewAnn({...newAnn, priority: 'high'})} className={`flex-1 py-2 rounded-xl border text-[9px] font-black transition-all ${newAnn.priority === 'high' ? 'bg-red-600 text-white border-red-500 shadow-lg shadow-red-600/20' : 'bg-slate-900 text-slate-500 border-white/5'}`}>KHẨN CẤP</button>
+                    </div>
+                 </div>
+                 <div className="space-y-2">
+                    <label className="text-[9px] font-black text-slate-500 uppercase italic">Tiêu đề bản tin</label>
+                    <input type="text" placeholder="Bảo trì hệ thống..." value={newAnn.title} onChange={e => setNewAnn({...newAnn, title: e.target.value})} className="w-full bg-slate-900 border border-white/5 rounded-2xl px-6 py-4 text-white font-bold outline-none focus:border-indigo-500" />
+                 </div>
+                 <div className="space-y-2">
+                    <label className="text-[9px] font-black text-slate-500 uppercase italic">Nội dung chi tiết</label>
+                    <textarea placeholder="Hệ thống sẽ bảo trì vào lúc..." rows={4} value={newAnn.content} onChange={e => setNewAnn({...newAnn, content: e.target.value})} className="w-full bg-slate-900 border border-white/5 rounded-2xl px-6 py-4 text-white font-medium outline-none focus:border-indigo-500" />
+                 </div>
+              </div>
+              <div className="flex gap-4 pt-4">
+                 <button onClick={() => setShowAddAnn(false)} className="flex-1 py-4 bg-slate-800 text-slate-500 font-black rounded-xl text-[10px] uppercase">HỦY</button>
+                 <button onClick={handleCreateAnnouncement} className="flex-1 py-4 bg-indigo-600 text-white font-black rounded-xl text-[10px] uppercase shadow-lg">ĐĂNG TIN</button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* Original Giftcode Modal */}
       {showAddGc && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
            <div className="glass-card w-full max-w-md p-10 rounded-[2.5rem] border border-white/10 space-y-6 animate-in zoom-in-95">
@@ -449,7 +552,7 @@ export default function Admin({ user, onUpdateUser }: AdminProps) {
         </div>
       )}
 
-      {/* Modal Ads */}
+      {/* Original Ads Modal */}
       {showAddAd && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
            <div className="glass-card w-full max-w-md p-10 rounded-[2.5rem] border border-white/10 space-y-6 animate-in zoom-in-95">
