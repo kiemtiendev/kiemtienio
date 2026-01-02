@@ -196,7 +196,6 @@ export const dbService = {
   },
 
   getWithdrawals: async (userId?: string) => {
-    // NOVA ENHANCEMENT: Join users_data to get security_score
     let q = supabase.from('withdrawals').select('*, users_data(security_score)').order('created_at', { ascending: false });
     if (userId) q = q.eq('user_id', userId);
     const { data, error } = await q;
@@ -223,16 +222,17 @@ export const dbService = {
       return { error: 'INSUFFICIENT_BALANCE' };
     }
 
-    const { error } = await supabase.from('withdrawals').insert([{
+    // NOVA UPDATE: Insert and select the generated ID
+    const { data: inserted, error } = await supabase.from('withdrawals').insert([{
       user_id: req.userId, user_name: req.userName, amount: req.amount, type: req.type, status: 'pending', details: req.details
-    }]);
+    }]).select().single();
 
-    if (!error) {
-      // NOVA ALERT: Send notification to admin with security score
+    if (!error && inserted) {
+      // NOVA ALERT: Send notification to admin with Withdrawal ID and security score
       await dbService.addNotification({
         type: 'withdrawal',
         title: 'YÊU CẦU RÚT TIỀN MỚI',
-        content: `Người dùng ${req.userName} yêu cầu rút ${req.amount.toLocaleString()}đ. ĐIỂM TIN CẬY: ${user.security_score}%`,
+        content: `ID: #${inserted.id} - ${req.userName} rút ${req.amount.toLocaleString()}đ. ĐIỂM TIN CẬY: ${user.security_score}%`,
         userId: 'all',
         userName: req.userName
       });
