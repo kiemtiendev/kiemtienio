@@ -105,23 +105,23 @@ export default function Admin({ user, onUpdateUser, setSecurityModal, showToast,
     if (u.id === user.id) return alert("Bạn không thể tự xóa chính mình!");
     if (u.email === 'adminavudev@gmail.com') return alert("Không thể xóa tài khoản Admin hệ thống!");
     
-    if (!confirm(`CẢNH BÁO NGUY HIỂM: Bạn có chắc chắn muốn xóa VĨNH VIỄN hội viên ${u.fullname}? Mọi dữ liệu điểm thưởng, lịch sử rút và VIP của họ sẽ biến mất hoàn toàn!`)) return;
+    if (!confirm(`CẢNH BÁO NGUY HIỂM: Bạn có chắc chắn muốn xóa VĨNH VIỄN hội viên ${u.fullname}? Dữ liệu liên quan đến người dùng này sẽ biến mất hoàn toàn và không thể khôi phục!`)) return;
     
     setIsActionLoading(true);
     const res = await dbService.deleteUser(u.id);
     
     if (res.success) {
-      // Cập nhật state cục bộ ngay lập tức để UI biến mất
-      setUsers(prev => prev.filter(item => item.id !== u.id));
+      // Cập nhật state local ngay lập tức để hội viên biến mất khỏi UI
+      setUsers(prev => prev.filter(userItem => userItem.id !== u.id));
       setActiveUserMenu(null);
       
-      // Hiển thị Gold Modal sang trọng báo cáo thành công
+      // Hiển thị Gold Modal sang trọng báo cáo thành công (Optimistic UI)
       showGoldSuccess(
-        "XÓA HỘI VIÊN THÀNH CÔNG", 
-        `Hệ thống đã loại bỏ toàn bộ dữ liệu của ${u.fullname} khỏi máy chủ Diamond Nova vĩnh viễn.`
+        "XÓA THÀNH CÔNG", 
+        `Toàn bộ dữ liệu của hội viên ${u.fullname} đã được loại bỏ vĩnh viễn khỏi máy chủ Diamond Nova.`
       );
     } else {
-      showToast('LỖI HỆ THỐNG', res.message, 'error');
+      showToast('ADMIN', res.message, 'error');
     }
     setIsActionLoading(false);
   };
