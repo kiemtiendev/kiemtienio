@@ -111,7 +111,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
           <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
              <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-3 italic">Tài trợ Nova</p>
-             <div className="relative w-full h-24 rounded-xl overflow-hidden group cursor-pointer bg-slate-800">
+             <div className="relative w-full h-24 rounded-xl overflow-hidden group cursor-pointer bg-slate-800 shadow-inner">
                {ads.length > 0 ? (
                  ads.map((ad, idx) => (
                    <a 
@@ -131,7 +131,9 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                    </a>
                  ))
                ) : (
-                 <div className="h-full flex items-center justify-center text-slate-600 text-[10px] uppercase font-black">Quảng cáo đang tải...</div>
+                 <div className="h-full flex items-center justify-center text-slate-600 text-[10px] uppercase font-black italic">
+                   <Loader2 className="animate-spin mr-2 w-4 h-4" /> Đang tải quảng cáo...
+                 </div>
                )}
              </div>
           </div>
