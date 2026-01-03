@@ -8,7 +8,7 @@ import {
   PlusCircle, Search, CheckCircle2, XCircle, Settings, UserMinus, 
   UserPlus, ShieldAlert, Ban, Unlock, Wallet, Activity, TrendingUp, DollarSign,
   RefreshCcw, UserX, AlertTriangle, Loader2, X, ShieldCheck, Edit, Calendar, Clock,
-  Building2, Gamepad2, FileText, ExternalLink
+  Building2, Gamepad2, FileText, ExternalLink, Copy
 } from 'lucide-react';
 
 interface AdminProps {
@@ -365,9 +365,9 @@ export default function Admin({ user, onUpdateUser, setSecurityModal, showToast,
             <h3 className="text-2xl font-black text-white italic uppercase tracking-tighter">DUYỆT NẠP VIP (CHUYỂN KHOẢN)</h3>
             <div className="overflow-x-auto">
                <table className="w-full text-left">
-                  <thead><tr className="text-[10px] font-black text-slate-500 uppercase italic border-b border-white/5 tracking-[0.2em]"><th className="px-6 py-6">Thời gian</th><th className="px-6 py-6">Người gửi</th><th className="px-6 py-6">Gói VIP</th><th className="px-6 py-6">Bill</th><th className="px-6 py-6 text-right">Xử lý</th></tr></thead>
+                  <thead><tr className="text-[10px] font-black text-slate-500 uppercase italic border-b border-white/5 tracking-[0.2em]"><th className="px-6 py-6">Thời gian</th><th className="px-6 py-6">Người gửi</th><th className="px-6 py-6">Gói VIP</th><th className="px-6 py-6">Nội dung CK</th><th className="px-6 py-6">Bill</th><th className="px-6 py-6 text-right">Xử lý</th></tr></thead>
                   <tbody className="divide-y divide-white/5">
-                    {vipRequests.length === 0 ? <tr><td colSpan={5} className="text-center py-10 text-slate-600 font-bold italic">Chưa có yêu cầu nạp tiền nào</td></tr> :
+                    {vipRequests.length === 0 ? <tr><td colSpan={6} className="text-center py-10 text-slate-600 font-bold italic">Chưa có yêu cầu nạp tiền nào</td></tr> :
                      vipRequests.map((v) => (
                       <tr key={v.id} className="text-xs hover:bg-white/[0.03] transition-all">
                         <td className="px-6 py-7 text-slate-500 font-bold">{new Date(v.created_at).toLocaleString('vi-VN')}</td>
@@ -376,6 +376,9 @@ export default function Admin({ user, onUpdateUser, setSecurityModal, showToast,
                           <div className="text-[9px] text-amber-500 mt-1 font-bold">{v.amount_vnd.toLocaleString()} VND</div>
                         </td>
                         <td className="px-6 py-7"><span className="px-3 py-1 bg-slate-800 rounded text-[10px] font-black uppercase text-white border border-white/10">{v.vip_tier}</span></td>
+                        <td className="px-6 py-7">
+                           <span className="font-black text-amber-500 bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded select-all whitespace-nowrap">{v.transfer_content || '---'}</span>
+                        </td>
                         <td className="px-6 py-7">
                            {v.bill_url ? (
                              <button onClick={() => setViewBill(v.bill_url)} className="flex items-center gap-2 text-blue-400 hover:text-blue-300 font-bold italic bg-blue-500/10 px-3 py-2 rounded-lg border border-blue-500/20">
