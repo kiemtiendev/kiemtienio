@@ -183,19 +183,31 @@ export const dbService = {
   },
 
   claimGiftcode: async (userId: string, code: string) => {
+    const safeUserId = String(userId).trim();
+    
+    // 1. Kiểm tra Giftcode
     const { data: gcRaw, error: gcError } = await supabase.from('giftcodes').select('*').eq('code', code.trim().toUpperCase()).eq('is_active', true).maybeSingle();
     if (gcError || !gcRaw) return { success: false, message: 'Mã không tồn tại hoặc đã hết hạn.' };
     
     const gc = mapGiftcode(gcRaw);
-    if (gc.usedBy.includes(userId)) return { success: false, message: 'Bạn đã sử dụng mã này rồi.' };
+    if (gc.usedBy.includes(safeUserId)) return { success: false, message: 'Bạn đã sử dụng mã này rồi.' };
     
     if (gc.maxUses > 0 && gc.usedBy.length >= gc.maxUses) {
       return { success: false, message: 'Mã đã đạt giới hạn lượt sử dụng.' };
     }
 
-    const { data: u } = await supabase.from('users_data').select('id, balance, total_giftcode_earned').eq('id', userId).single();
-    if (!u) return { success: false, message: 'Lỗi xác thực người dùng.' };
+    // 2. Xác thực người dùng (Fix lỗi xác thực ở đây bằng maybeSingle và ID safe)
+    const { data: u, error: uError } = await supabase.from('users_data').select('id, balance, total_giftcode_earned').eq('id', safeUserId).maybeSingle();
+    
+    if (uError) {
+        console.error("Lỗi truy vấn user:", uError);
+        return { success: false, message: 'Lỗi kết nối CSDL.' };
+    }
+    if (!u) {
+        return { success: false, message: 'Lỗi xác thực người dùng. Vui lòng đăng nhập lại.' };
+    }
 
+    // 3. Cộng tiền
     const { error: updErr } = await supabase.from('users_data').update({ 
       balance: Number(u.balance) + gc.amount,
       total_giftcode_earned: (Number(u.total_giftcode_earned) || 0) + gc.amount
@@ -203,8 +215,8 @@ export const dbService = {
     
     if (updErr) return { success: false, message: 'Lỗi hệ thống khi cộng điểm.' };
 
-    // Update used_by safely
-    const newUsedBy = [...(gc.usedBy || []), userId];
+    // 4. Cập nhật lượt dùng
+    const newUsedBy = [...(gc.usedBy || []), safeUserId];
     await supabase.from('giftcodes').update({ used_by: newUsedBy }).eq('id', gcRaw.id);
     
     return { success: true, amount: gc.amount, message: `Thành công! Nhận ${gc.amount.toLocaleString()} P.` };

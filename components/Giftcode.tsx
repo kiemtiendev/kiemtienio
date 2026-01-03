@@ -47,14 +47,21 @@ const Giftcode: React.FC<Props> = ({ user, onUpdateUser, showGoldSuccess }) => {
         );
       } else {
         setStatus('error');
-        setMsg(res.message);
+        setMsg(res.message || "Lỗi không xác định");
       }
     } catch (e) {
       console.error(e);
       setStatus('error');
       setMsg('Lỗi hệ thống. Vui lòng thử lại sau.');
     } finally {
-      setTimeout(() => { setStatus(prev => prev !== 'loading' ? 'idle' : prev); }, 5000);
+      // Auto clear status after 5s if it's error or success (but keep loading if stuck?)
+      setTimeout(() => { 
+          setStatus(prev => {
+              if (prev === 'success' || prev === 'error') return 'idle';
+              return prev;
+          }); 
+          if(status === 'success' || status === 'error') setMsg('');
+      }, 5000);
     }
   };
 
@@ -105,7 +112,7 @@ const Giftcode: React.FC<Props> = ({ user, onUpdateUser, showGoldSuccess }) => {
             )}
           </button>
 
-          {status !== 'idle' && (
+          {status !== 'idle' && msg && (
             <div className={`p-4 rounded-2xl flex items-center gap-3 animate-in slide-in-from-top-2 ${status === 'success' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
               {status === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
               <span className="font-bold text-sm">{msg}</span>

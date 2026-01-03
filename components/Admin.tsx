@@ -43,6 +43,7 @@ export default function Admin({ user, onUpdateUser, setSecurityModal, showToast,
   const [showAddGc, setShowAddGc] = useState(false);
   const [showAddAd, setShowAddAd] = useState(false);
   const [showAddAnn, setShowAddAnn] = useState(false);
+  const [viewBill, setViewBill] = useState<string | null>(null);
   
   const [newGc, setNewGc] = useState({ code: '', amount: 10000, maxUses: 100 });
   const [newAd, setNewAd] = useState({ title: '', imageUrl: '', targetUrl: '' });
@@ -183,7 +184,7 @@ export default function Admin({ user, onUpdateUser, setSecurityModal, showToast,
 
   return (
     <div className="space-y-10 animate-in fade-in pb-32">
-      <div className="glass-card p-8 rounded-[3.5rem] border border-blue-500/20 bg-blue-600/5 flex items-center justify-between shadow-2xl">
+      <div className="glass-card p-8 rounded-[3.5rem] border border-blue-500/20 bg-blue-600/5 flex items-center justify-center md:justify-between shadow-2xl flex-wrap gap-4">
          <div className="flex items-center gap-6">
             <div className="p-4 bg-blue-600 rounded-3xl shadow-lg shadow-blue-600/30">
                <ShieldCheck className="w-10 h-10 text-white" />
@@ -313,6 +314,7 @@ export default function Admin({ user, onUpdateUser, setSecurityModal, showToast,
                                 <th>Mã Đơn</th>
                                 <th>Hội Viên</th>
                                 <th>Số Tiền</th>
+                                <th>Ảnh Bill</th>
                                 <th>Tình Trạng</th>
                                 <th className="text-right">Hành Động</th>
                             </tr>
@@ -326,6 +328,18 @@ export default function Admin({ user, onUpdateUser, setSecurityModal, showToast,
                                     <div className="text-[10px] opacity-60">{req.email}</div>
                                   </td>
                                   <td style={{ color: '#2ecc71', fontWeight: 900 }}>+ {req.amount_vnd?.toLocaleString()}đ</td>
+                                  <td>
+                                    {req.bill_url ? (
+                                      <button 
+                                        onClick={() => setViewBill(req.bill_url)}
+                                        className="flex items-center gap-2 text-[9px] font-black text-blue-400 bg-blue-400/10 px-3 py-2 rounded-lg hover:bg-blue-400 hover:text-white transition-all border border-blue-400/20 uppercase tracking-wider"
+                                      >
+                                         <ImageIcon size={12} /> Xem Bill
+                                      </button>
+                                    ) : (
+                                      <span className="text-[9px] text-slate-600 italic opacity-50">---</span>
+                                    )}
+                                  </td>
                                   <td>
                                     <span className={`badge ${req.status === 'pending' ? 'badge-pending' : req.status === 'completed' ? 'badge-success' : 'badge-danger'}`}>
                                       {req.status === 'pending' ? 'Chờ xử lý' : req.status === 'completed' ? 'Thành công' : 'Đã hủy'}
@@ -342,7 +356,7 @@ export default function Admin({ user, onUpdateUser, setSecurityModal, showToast,
                               </tr>
                             ))}
                             {vipRequests.length === 0 && (
-                              <tr><td colSpan={5} className="text-center py-8 opacity-50 italic">Không có yêu cầu thanh toán nào.</td></tr>
+                              <tr><td colSpan={6} className="text-center py-8 opacity-50 italic">Không có yêu cầu thanh toán nào.</td></tr>
                             )}
                         </tbody>
                     </table>
@@ -476,6 +490,13 @@ export default function Admin({ user, onUpdateUser, setSecurityModal, showToast,
       </div>
 
       {/* MODALS */}
+      {viewBill && (
+        <div className="fixed inset-0 z-[500] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setViewBill(null)}>
+           <button onClick={() => setViewBill(null)} className="absolute top-6 right-6 text-slate-500 hover:text-white transition-colors p-2 bg-white/5 rounded-full"><X size={24} /></button>
+           <img src={viewBill} className="max-w-full max-h-[90vh] object-contain rounded-2xl border border-white/10 shadow-2xl animate-in zoom-in-95 duration-300" onClick={(e) => e.stopPropagation()} />
+        </div>
+      )}
+
       {showAddGc && (
         <div className="fixed inset-0 z-[400] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6">
            <div className="glass-card w-full max-w-md p-12 rounded-[4rem] border border-emerald-500/20 animate-in zoom-in-95 relative shadow-[0_0_100px_rgba(16,185,129,0.1)]">
