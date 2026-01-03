@@ -208,12 +208,17 @@ export const dbService = {
     }
 
     // 3. Cộng tiền
+    // FIX: Chỉ cập nhật balance và total_earned (những cột chắc chắn có).
+    // Bỏ total_giftcode_earned để tránh lỗi nếu cột chưa được tạo trong DB.
     const { error: updErr } = await supabase.from('users_data').update({ 
       balance: Number(u.balance) + gc.amount,
-      total_giftcode_earned: (Number(u.total_giftcode_earned) || 0) + gc.amount
+      total_earned: (Number(u.total_earned) || 0) + gc.amount
     }).eq('id', u.id);
     
-    if (updErr) return { success: false, message: 'Lỗi hệ thống khi cộng điểm.' };
+    if (updErr) {
+        console.error("Lỗi update giftcode:", updErr);
+        return { success: false, message: `Lỗi hệ thống: ${updErr.message}` };
+    }
 
     // 4. Cập nhật lượt dùng
     const newUsedBy = [...(gc.usedBy || []), safeUserId];
@@ -256,6 +261,7 @@ export const dbService = {
     const { error } = await supabase.from('vip_requests').update({ status }).eq('id', requestId);
     if (error) return { success: false, message: error.message };
 
+    // Xử lý khi Duyệt thành công (Cộng ngày VIP)
     if (status === 'completed' && userId && vipTier && amountVnd) {
       let days = 1;
       if (amountVnd >= 500000) days = 30;
@@ -263,6 +269,7 @@ export const dbService = {
       else if (amountVnd >= 20000) days = 1;
 
       const until = new Date();
+      // Logic đơn giản: cộng ngày từ thời điểm hiện tại.
       until.setDate(until.getDate() + days);
 
       const { error: userError } = await supabase.from('users_data').update({
@@ -271,6 +278,31 @@ export const dbService = {
       }).eq('id', userId);
 
       if (userError) return { success: false, message: 'Đã duyệt nhưng lỗi cập nhật VIP user.' };
+    } 
+    
+    // Xử lý khi Hoàn tiền (Refund) -> Cộng lại Points
+    else if (status === 'refunded' && userId && amountVnd) {
+         const refundPoints = amountVnd * RATE_VND_TO_POINT; // 1 VND = 10 P
+         
+         // Lấy balance hiện tại
+         const { data: u } = await supabase.from('users_data').select('balance').eq('id', userId).maybeSingle();
+         
+         if (u) {
+             const { error: refundErr } = await supabase.from('users_data').update({
+                 balance: Number(u.balance) + refundPoints
+             }).eq('id', userId);
+
+             if (refundErr) return { success: false, message: 'Lỗi khi hoàn điểm cho user.' };
+
+             // Thông báo cho user
+             await supabase.from('notifications').insert([{
+                user_id: userId,
+                title: 'HOÀN TIỀN YÊU CẦU VIP',
+                content: `Yêu cầu nâng cấp VIP trị giá ${amountVnd.toLocaleString()}đ đã bị từ chối/hủy. Hệ thống đã hoàn ${refundPoints.toLocaleString()} P vào tài khoản của bạn.`,
+                type: 'system',
+                created_at: new Date().toISOString()
+             }]);
+         }
     }
     
     return { success: true };
