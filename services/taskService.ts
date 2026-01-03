@@ -20,8 +20,10 @@ export const openTaskLink = async (taskId: number, userId: string, token: string
     case 2: apiUrl = `https://yeulink.com/api?token=${task.apiKey}&url=${dest}`; break;
     case 3: apiUrl = `https://yeumoney.com/QL_api.php?token=${task.apiKey}&format=json&url=${dest}`; break;
     case 4: apiUrl = `https://xlink.co/api?token=${task.apiKey}&url=${dest}`; break;
-    case 5: apiUrl = `https://services.traffictot.com/api/v1/shorten/redirect?api_key=${task.apiKey}&url=${dest}`; break;
-    case 6: apiUrl = `https://api.layma.net/api/admin/shortlink/quicklink?tokenUser=${task.apiKey}&format=json&url=${dest}`; break;
+    // FIX: Sử dụng endpoint chuẩn cho Traffictot
+    case 5: apiUrl = `https://traffictot.com/api?api=${task.apiKey}&url=${dest}`; break;
+    // FIX: Sử dụng endpoint chuẩn cho Laymanet
+    case 6: apiUrl = `https://layma.net/api?api=${task.apiKey}&url=${dest}`; break;
   }
 
   if (!apiUrl) return;
@@ -43,7 +45,9 @@ export const openTaskLink = async (taskId: number, userId: string, token: string
         const response = await fetch(proxyFn(url));
         if (response.ok) {
           const json = await response.json();
-          return json.contents || JSON.stringify(json);
+          // AllOrigins returns data in 'contents' property, possibly as string
+          const raw = json.contents || json;
+          return typeof raw === 'string' ? raw : JSON.stringify(raw);
         }
       } catch (e) { continue; }
     }
@@ -53,17 +57,25 @@ export const openTaskLink = async (taskId: number, userId: string, token: string
   try {
     const content = await fetchWithFallback(apiUrl);
     let realLink = "";
+    
+    // Xử lý parse JSON linh hoạt cho nhiều định dạng API
     try {
       const data = JSON.parse(content);
-      realLink = data.shortenedUrl || data.url || data.link || (data.data && data.data.shortenedUrl);
+      // Các trường phổ biến: shortenedUrl, url, link, short_link, hoặc data.shortenedUrl
+      realLink = data.shortenedUrl || data.url || data.link || data.short_link || (data.data && data.data.shortenedUrl);
     } catch {
+      // Fallback regex nếu API trả về text hoặc HTML chứa link
       const match = content.match(/https?:\/\/[^\s"'<>]+/);
       if (match) realLink = match[0];
     }
 
-    if (realLink && newWindow) newWindow.location.href = realLink;
-    else throw new Error("Link không hợp lệ.");
+    if (realLink && realLink.startsWith('http') && newWindow) {
+        newWindow.location.href = realLink;
+    } else {
+        console.error("API Response:", content);
+        throw new Error("Link không hợp lệ hoặc API lỗi.");
+    }
   } catch (err: any) {
-    if (newWindow) newWindow.document.body.innerHTML = `<p style="color:red">LỖI: ${err.message}</p>`;
+    if (newWindow) newWindow.document.body.innerHTML = `<p style="color:red;text-align:center;padding:20px;">LỖI KẾT NỐI API: ${err.message}<br/>Vui lòng thử lại sau hoặc chọn cổng khác.</p>`;
   }
 };
