@@ -5,7 +5,8 @@ import { dbService, supabase } from './services/dbService.ts';
 import { NAV_ITEMS, formatK, SOCIAL_LINKS } from './constants.tsx';
 import { 
   Menu, LogOut, Sparkles, Bot, WifiOff, Bell, Activity, X, Star, Sun, Moon, 
-  Crown, MessageCircle, Youtube, Send, MessageSquare, Plus, AlertTriangle, Clock
+  Crown, MessageCircle, Youtube, Send, MessageSquare, Plus, AlertTriangle, Clock,
+  Facebook, Users as UsersIcon
 } from 'lucide-react';
 
 // Components
@@ -25,7 +26,7 @@ import GlobalSearch from './components/GlobalSearch.tsx';
 import Vip from './components/Vip.tsx';
 import NovaNotification, { NovaSecurityModal } from './components/NovaNotification.tsx';
 import GoldModal from './components/GoldModal.tsx';
-import GlobalAlertSystem from './components/GlobalAlertSystem.tsx'; // Import hệ thống alert mới
+import GlobalAlertSystem from './components/GlobalAlertSystem.tsx';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -60,13 +61,6 @@ const App: React.FC = () => {
     setIsLoading(false);
   };
 
-  const toggleTheme = () => {
-    const newTheme = theme === 'dark' ? 'light' : 'dark';
-    setTheme(newTheme);
-    localStorage.setItem('nova_theme', newTheme);
-    document.documentElement.classList.toggle('dark', newTheme === 'dark');
-  };
-
   useEffect(() => {
     loadSession();
     const handleOnline = () => { setIsOnline(true); showToast('ONLINE', 'Đã kết nối Nova Cloud.', 'success'); };
@@ -74,15 +68,12 @@ const App: React.FC = () => {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    // Sync User Data
     const userChannel = supabase.channel('user-sync').on('postgres_changes', { event: '*', schema: 'public', table: 'users_data' }, (payload) => {
       if (user && ((payload.new as any)?.id === user.id || (payload.old as any)?.id === user.id)) loadSession();
     }).subscribe();
 
-    // Sync Notifications (For Admin & User)
     const notifChannel = supabase.channel('notif-sync').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, (payload) => {
         const newNotif = payload.new as any;
-        // Notify if it's for this user or for 'all' (System messages)
         if (user && (newNotif.user_id === user.id || newNotif.user_id === 'all')) {
            setHasNewNotif(true);
            showToast(newNotif.title, newNotif.content, 'info');
@@ -99,16 +90,11 @@ const App: React.FC = () => {
 
   const logout = () => { dbService.logout(); setUser(null); setCurrentView(AppView.DASHBOARD); showToast('Hẹn gặp lại', 'Đã đăng xuất an toàn.', 'info'); };
 
-  // Update user with return value for error handling
   const updateUser = async (updated: User) => { 
-    // Optimistic update locally
     setUser(updated); 
-    // Persist to DB and return result
     const res = await dbService.updateUser(updated.id, updated);
-    // If failed, revert or warn (though here we just return result for caller to handle)
     if (!res.success) {
         showToast('LỖI CẬP NHẬT', res.message || 'Không thể lưu thay đổi.', 'error');
-        // Re-fetch to revert changes
         loadSession(); 
     }
     return res;
@@ -126,6 +112,19 @@ const App: React.FC = () => {
     return null;
   }, [user?.isVip, user?.vipUntil]);
 
+  // Helper cho menu Social
+  const getSocialConfig = (key: string) => {
+    switch (key) {
+      case 'facebook': return { icon: <Facebook size={20} />, color: 'bg-[#1877F2]', label: 'Facebook' };
+      case 'youtube': return { icon: <Youtube size={20} />, color: 'bg-[#FF0000]', label: 'Youtube' };
+      case 'zalo': return { icon: <MessageCircle size={20} />, color: 'bg-[#0068FF]', label: 'Zalo' };
+      case 'telegram': return { icon: <Send size={20} />, color: 'bg-[#229ED9]', label: 'Telegram' };
+      case 'telegramGroup': return { icon: <UsersIcon size={20} />, color: 'bg-[#229ED9]', label: 'Nhóm hỗ trợ' };
+      case 'telegramBot': return { icon: <Bot size={20} />, color: 'bg-[#8E44AD]', label: 'Nova Bot' };
+      default: return { icon: <Send size={20} />, color: 'bg-slate-800', label: 'Liên kết' };
+    }
+  };
+
   if (isLoading) return <div className="min-h-screen bg-[#06080c] flex items-center justify-center text-blue-500 animate-pulse font-black uppercase italic tracking-widest text-xs">Nova Syncing...</div>;
   if (!user) return <Login onLoginSuccess={(u) => { setUser(u); showToast('Chào mừng', `Xin chào ${u.fullname}!`, 'success'); }} />;
 
@@ -134,7 +133,7 @@ const App: React.FC = () => {
 
   return (
     <div className={`min-h-screen flex ${theme === 'dark' ? 'bg-[#06080c]' : 'bg-slate-50'} text-slate-200 transition-colors duration-500`}>
-      <GlobalAlertSystem /> {/* Gắn hệ thống thông báo toàn cục */}
+      <GlobalAlertSystem />
       <NovaNotification notifications={notifications} removeNotification={removeNotification} />
       {securityModal.isOpen && <NovaSecurityModal score={securityModal.score} onClose={() => setSecurityModal({ isOpen: false, score: 0 })} />}
       <GoldModal 
@@ -238,15 +237,36 @@ const App: React.FC = () => {
         </div>
       </main>
 
-      <div className="fixed bottom-6 right-6 z-[200] flex flex-col items-end gap-3">
+      {/* FIXED SOCIAL MENU */}
+      <div className="fixed bottom-6 right-6 z-[200] flex flex-col items-end gap-4">
         {isSocialMenuOpen && (
-          <div className="flex flex-col gap-3 mb-3 animate-in slide-in-from-bottom-6 duration-300">
-            {Object.entries(SOCIAL_LINKS).map(([key, url]) => (
-               <a key={key} href={url} target="_blank" className="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center text-white shadow-xl hover:scale-110 transition-all border border-white/5"><Send size={18} /></a>
-            ))}
+          <div className="flex flex-col gap-4 mb-2 animate-in slide-in-from-bottom-10 duration-500">
+            {Object.entries(SOCIAL_LINKS).map(([key, url]) => {
+              const config = getSocialConfig(key);
+              return (
+                <div key={key} className="flex items-center gap-3 group">
+                  <span className="opacity-0 group-hover:opacity-100 bg-black/60 backdrop-blur-md text-[9px] font-black text-white px-3 py-1.5 rounded-lg uppercase tracking-widest border border-white/10 transition-all pointer-events-none">
+                    {config.label}
+                  </span>
+                  <a 
+                    href={url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className={`w-12 h-12 ${config.color} rounded-2xl flex items-center justify-center text-white shadow-2xl hover:scale-110 hover:rotate-6 transition-all border border-white/20`}
+                  >
+                    {config.icon}
+                  </a>
+                </div>
+              );
+            })}
           </div>
         )}
-        <button onClick={() => setIsSocialMenuOpen(!isSocialMenuOpen)} className={`w-14 h-14 rounded-full flex items-center justify-center text-white shadow-2xl transition-all ${isSocialMenuOpen ? 'bg-rose-600 rotate-45' : 'bg-blue-600'}`}><MessageSquare size={24} /></button>
+        <button 
+          onClick={() => setIsSocialMenuOpen(!isSocialMenuOpen)} 
+          className={`w-14 h-14 rounded-[1.5rem] flex items-center justify-center text-white shadow-[0_10px_40px_rgba(0,0,0,0.5)] transition-all duration-500 hover:scale-110 ${isSocialMenuOpen ? 'bg-rose-600 rotate-[135deg]' : 'bg-blue-600 shadow-blue-600/20'}`}
+        >
+          {isSocialMenuOpen ? <Plus size={28} /> : <MessageSquare size={28} />}
+        </button>
       </div>
     </div>
   );

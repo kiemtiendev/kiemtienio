@@ -7,7 +7,7 @@ import {
   Crown, Sparkles, Zap, ShieldCheck, CheckCircle2, Trophy, 
   ArrowRight, Loader2, Star, CreditCard, Wallet, Copy, 
   CheckCircle, Image as ImageIcon, AlertTriangle, X, History, Clock,
-  Medal, ArrowUp
+  Medal, ArrowUp, Calendar
 } from 'lucide-react';
 
 interface Props {
@@ -54,10 +54,8 @@ const Vip: React.FC<Props> = ({ user, onUpdateUser, showGoldSuccess }) => {
     setBillFile(null);
   };
 
-  // Fixed handleBuyWithPoints to use showGoldSuccess for a better UI experience
   const handleBuyWithPoints = async () => {
     if (user.balance < selectedPkg.vnd * 10) return alert("Số dư Nova không đủ.");
-    // Custom confirm is async
     if (!(await confirm(`XÁC NHẬN: Dùng ${(selectedPkg.vnd * 10).toLocaleString()} P để nâng cấp ${selectedPkg.name}?`))) return;
     setIsLoading(true);
     const res = await dbService.upgradeVipTiered(user.id, selectedPkg.vnd);
@@ -68,7 +66,6 @@ const Vip: React.FC<Props> = ({ user, onUpdateUser, showGoldSuccess }) => {
       setShowDepositModal(false);
       refreshData();
       
-      // Use the luxury gold success modal instead of a standard alert
       showGoldSuccess(
         "NÂNG CẤP VIP THÀNH CÔNG",
         `Chúc mừng! Bạn đã nâng cấp lên ${selectedPkg.name} thành công. Tận hưởng các quyền lợi đặc biệt ngay bây giờ.`
@@ -78,7 +75,6 @@ const Vip: React.FC<Props> = ({ user, onUpdateUser, showGoldSuccess }) => {
     }
   };
 
-  // Fixed handleBankSubmit to use showGoldSuccess for a better UI experience
   const handleBankSubmit = async () => {
     if (!billFile) return alert("Vui lòng tải ảnh bill chuyển khoản.");
     setIsLoading(true);
@@ -101,6 +97,16 @@ const Vip: React.FC<Props> = ({ user, onUpdateUser, showGoldSuccess }) => {
     }
   };
 
+  // Helper tính ngày hết hạn
+  const calculateExpiry = (createdAt: string, tier: string) => {
+    const date = new Date(createdAt);
+    const tierName = String(tier).toUpperCase();
+    if (tierName.includes('ELITE')) date.setDate(date.getDate() + 30);
+    else if (tierName.includes('PRO')) date.setDate(date.getDate() + 7);
+    else date.setDate(date.getDate() + 1);
+    return date.toLocaleString('vi-VN');
+  };
+
   return (
     <div className="max-w-6xl mx-auto space-y-12 py-6 animate-in fade-in pb-20">
       <div className="glass-card p-12 rounded-[4rem] text-center border border-amber-500/20 bg-gradient-to-br from-amber-500/10 to-transparent">
@@ -110,7 +116,6 @@ const Vip: React.FC<Props> = ({ user, onUpdateUser, showGoldSuccess }) => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* VIP Ranking */}
         <div className="lg:col-span-1 glass-card p-8 rounded-[3rem] border border-amber-500/10 bg-amber-500/5">
            <div className="flex items-center gap-3 mb-6 text-amber-500">
               <Trophy size={20} /> <h3 className="font-black italic uppercase text-sm tracking-widest">TOP ĐẠI GIA</h3>
@@ -128,7 +133,6 @@ const Vip: React.FC<Props> = ({ user, onUpdateUser, showGoldSuccess }) => {
            </div>
         </div>
 
-        {/* VIP Packages */}
         <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-6">
            {packages.map(pkg => (
              <div key={pkg.tier} className={`glass-card p-8 rounded-[3rem] border-2 transition-all flex flex-col justify-between group hover:scale-105 relative overflow-hidden ${pkg.rich} ${pkg.bg}`}>
@@ -148,29 +152,47 @@ const Vip: React.FC<Props> = ({ user, onUpdateUser, showGoldSuccess }) => {
         </div>
       </div>
 
-      {/* History Table */}
-      <div className="glass-card p-10 rounded-[3.5rem] border border-white/5 bg-slate-900/10">
+      <div className="glass-card p-10 rounded-[3.5rem] border border-white/5 bg-slate-900/10 shadow-xl overflow-hidden">
          <div className="flex items-center gap-4 mb-8">
-            <History className="text-blue-400" />
+            <div className="p-3 bg-blue-600/10 rounded-2xl">
+               <History className="text-blue-400 w-6 h-6" />
+            </div>
             <h3 className="text-xl font-black text-white italic uppercase tracking-tighter">LỊCH SỬ GIAO DỊCH VIP</h3>
          </div>
          <div className="overflow-x-auto">
             <table className="w-full text-left">
                <thead className="text-[9px] font-black text-slate-500 uppercase italic border-b border-white/5">
-                  <tr><th className="px-6 py-4">Gói</th><th className="px-6 py-4">Thanh Toán</th><th className="px-6 py-4">Thời Gian</th><th className="px-6 py-4 text-right">Trạng Thái</th></tr>
+                  <tr>
+                    <th className="px-6 py-4">Gói</th>
+                    <th className="px-6 py-4">Thanh Toán</th>
+                    <th className="px-6 py-4">Ngày Đăng Ký</th>
+                    <th className="px-6 py-4">Hết Hạn</th>
+                    <th className="px-6 py-4 text-right">Trạng Thái</th>
+                  </tr>
                </thead>
                <tbody className="divide-y divide-white/5">
                   {vipHistory.length === 0 ? (
-                    <tr><td colSpan={4} className="py-10 text-center text-slate-600 font-black uppercase italic text-xs">Chưa có giao dịch nào</td></tr>
+                    <tr><td colSpan={5} className="py-12 text-center text-slate-600 font-black uppercase italic text-xs tracking-widest">Hệ thống chưa ghi nhận giao dịch nào</td></tr>
                   ) : (
                     vipHistory.map((v, idx) => (
-                      <tr key={idx} className="group hover:bg-white/[0.02]">
-                         <td className="px-6 py-5 font-bold text-white uppercase italic text-xs">{v.vip_tier}</td>
-                         <td className="px-6 py-5 font-black text-amber-500 text-xs">{v.amount_vnd?.toLocaleString()}đ</td>
-                         <td className="px-6 py-5 text-slate-500 text-[10px] font-medium italic">{new Date(v.created_at).toLocaleString('vi-VN')}</td>
-                         <td className="px-6 py-5 text-right">
-                            <span className={`px-4 py-1.5 rounded-full text-[8px] font-black uppercase italic ${v.status === 'completed' ? 'bg-emerald-500/10 text-emerald-500' : v.status === 'pending' ? 'bg-amber-500/10 text-amber-500' : 'bg-red-500/10 text-red-500'}`}>
-                               {v.status === 'pending' ? 'ĐANG CHỜ' : v.status === 'completed' ? 'THÀNH CÔNG' : 'HỦY'}
+                      <tr key={idx} className="group hover:bg-white/[0.02] transition-colors">
+                         <td className="px-6 py-6 font-bold text-white uppercase italic text-xs">{v.vip_tier}</td>
+                         <td className="px-6 py-6 font-black text-amber-500 text-xs">{(v.amount_vnd || 0).toLocaleString()}đ</td>
+                         <td className="px-6 py-6 text-slate-400 text-[10px] font-medium italic flex items-center gap-2">
+                            <Clock size={12} className="opacity-40" /> {new Date(v.created_at).toLocaleString('vi-VN')}
+                         </td>
+                         <td className="px-6 py-6 text-[10px] font-black italic">
+                            {v.status === 'completed' ? (
+                               <div className="flex items-center gap-2 text-rose-400">
+                                  <Calendar size={12} className="opacity-60" /> {calculateExpiry(v.created_at, v.vip_tier)}
+                               </div>
+                            ) : (
+                               <span className="text-slate-700">---</span>
+                            )}
+                         </td>
+                         <td className="px-6 py-6 text-right">
+                            <span className={`px-4 py-1.5 rounded-full text-[8px] font-black uppercase italic border ${v.status === 'completed' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : v.status === 'pending' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>
+                               {v.status === 'pending' ? 'ĐANG CHỜ' : v.status === 'completed' ? 'THÀNH CÔNG' : 'BỊ TỪ CHỐI'}
                             </span>
                          </td>
                       </tr>
