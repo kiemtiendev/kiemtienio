@@ -80,8 +80,11 @@ export const dbService = {
     const { data: existing } = await supabase.from('users_data').select('id').eq('email', cleanEmail).maybeSingle();
     if (existing) return { success: false, message: 'Email đã tồn tại.' };
 
+    // Tạo ID 8 chữ số ngẫu nhiên (10000000 - 99999999)
+    const random8DigitId = Math.floor(10000000 + Math.random() * 90000000).toString();
+
     const newUser = {
-      id: Math.random().toString(36).substr(2, 9).toUpperCase(),
+      id: random8DigitId,
       fullname: fullname.trim().toUpperCase(),
       email: cleanEmail,
       password_hash: pass.trim(),

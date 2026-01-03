@@ -98,8 +98,7 @@ const App: React.FC = () => {
         const res = await dbService.updateUser(updated.id, updated);
         if (!res.success) {
             showToast('LỖI CẬP NHẬT', res.message || 'Không thể lưu thay đổi.', 'error');
-            loadSession(); // Revert nếu lỗi
-            return res;
+            loadSession(); 
         }
         return res;
     }
