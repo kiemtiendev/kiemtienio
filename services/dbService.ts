@@ -46,11 +46,14 @@ const mapUser = (u: any): User => {
 };
 
 const mapGiftcode = (g: any): Giftcode => ({
+  id: g.id,
   code: g.code,
   amount: Number(g.amount || 0),
   maxUses: Number(g.max_uses || 0),
   usedBy: g.used_by || [],
   createdAt: g.created_at,
+  startDate: g.start_date,
+  endDate: g.end_date,
   isActive: Boolean(g.is_active)
 });
 
@@ -199,14 +202,24 @@ export const dbService = {
 
   claimGiftcode: async (userId: string, code: string) => {
     const safeUserId = String(userId).trim();
+    const now = new Date();
     
     // 1. Kiểm tra Giftcode (Lấy dữ liệu gốc)
     const { data: gcRaw, error: gcError } = await supabase.from('giftcodes').select('*').eq('code', code.trim().toUpperCase()).eq('is_active', true).maybeSingle();
-    if (gcError || !gcRaw) return { success: false, message: 'Mã không tồn tại hoặc đã hết hạn.' };
+    if (gcError || !gcRaw) return { success: false, message: 'Mã không tồn tại hoặc đã bị khóa.' };
     
-    const maxUses = Number(gcRaw.max_uses || 0);
-    const amount = Number(gcRaw.amount || 0);
-    const usedByArray = Array.isArray(gcRaw.used_by) ? gcRaw.used_by : [];
+    // Convert to Giftcode object
+    const gc = mapGiftcode(gcRaw);
+
+    // KIỂM TRA THỜI GIAN HIỆU LỰC
+    if (gc.startDate && now < new Date(gc.startDate)) {
+        return { success: false, message: 'Mã quà tặng chưa đến thời gian hiệu lực.' };
+    }
+    if (gc.endDate && now > new Date(gc.endDate)) {
+        return { success: false, message: 'Mã quà tặng đã hết hạn sử dụng.' };
+    }
+
+    const usedByArray = Array.isArray(gc.usedBy) ? gc.usedBy : [];
 
     // FIX LỖI 1: Kiểm tra xem user đã dùng chưa (So sánh chuỗi chặt chẽ để tránh lỗi type)
     if (usedByArray.some((id: any) => String(id) === safeUserId)) {
@@ -214,7 +227,7 @@ export const dbService = {
     }
     
     // FIX LỖI 2: Kiểm tra giới hạn lượt dùng
-    if (maxUses > 0 && usedByArray.length >= maxUses) {
+    if (gc.maxUses > 0 && usedByArray.length >= gc.maxUses) {
       return { success: false, message: 'Mã đã đạt giới hạn lượt sử dụng.' };
     }
 
@@ -227,8 +240,8 @@ export const dbService = {
 
     // 3. Cộng tiền cho User
     const { error: updErr } = await supabase.from('users_data').update({ 
-      balance: Number(u.balance) + amount,
-      total_earned: (Number(u.total_earned) || 0) + amount
+      balance: Number(u.balance) + gc.amount,
+      total_earned: (Number(u.total_earned) || 0) + gc.amount
     }).eq('id', u.id);
     
     if (updErr) {
@@ -241,13 +254,13 @@ export const dbService = {
     
     const { error: gcUpdateErr } = await supabase.from('giftcodes')
         .update({ used_by: newUsedBy })
-        .eq('id', gcRaw.id);
+        .eq('id', gc.id);
 
     if (gcUpdateErr) {
          console.error("Lỗi cập nhật giftcode used_by:", gcUpdateErr);
     }
     
-    return { success: true, amount: amount, message: `Thành công! Nhận ${amount.toLocaleString()} P.` };
+    return { success: true, amount: gc.amount, message: `Thành công! Nhận ${gc.amount.toLocaleString()} P.` };
   },
 
   getVipLeaderboard: async () => {
@@ -427,17 +440,40 @@ export const dbService = {
   },
 
   getGiftcodes: async () => { const { data } = await supabase.from('giftcodes').select('*').order('created_at', { ascending: false }); return (data || []).map(mapGiftcode); },
-  addGiftcode: async (code: string, amount: number, maxUses: number) => {
+  
+  addGiftcode: async (code: string, amount: number, maxUses: number, startDate?: string, endDate?: string) => {
     const { error } = await supabase.from('giftcodes').insert([{
       code: code.trim().toUpperCase(),
       amount: Number(amount),
       max_uses: Number(maxUses),
       used_by: [],
       created_at: new Date().toISOString(),
+      start_date: startDate,
+      end_date: endDate,
       is_active: true
     }]);
     return { error };
   },
+
+  updateGiftcode: async (id: string, updates: Partial<Giftcode>) => {
+    // Chỉ cập nhật các trường được phép
+    const dbUpdates: any = {};
+    if (updates.code) dbUpdates.code = updates.code.trim().toUpperCase();
+    if (updates.amount) dbUpdates.amount = updates.amount;
+    if (updates.maxUses) dbUpdates.max_uses = updates.maxUses;
+    if (updates.startDate) dbUpdates.start_date = updates.startDate;
+    if (updates.endDate) dbUpdates.end_date = updates.endDate;
+    if (updates.isActive !== undefined) dbUpdates.is_active = updates.isActive;
+
+    const { error } = await supabase.from('giftcodes').update(dbUpdates).eq('id', id);
+    return { success: !error, message: error ? error.message : 'Cập nhật thành công.' };
+  },
+
+  deleteGiftcode: async (id: string) => {
+    const { error } = await supabase.from('giftcodes').delete().eq('id', id);
+    return { success: !error, message: error ? error.message : 'Đã xóa Giftcode.' };
+  },
+
   getAds: async (inc = false) => { let q = supabase.from('ads').select('*'); if (!inc) q = q.eq('is_active', true); const { data } = await q; return (data || []).map(a => ({...a, imageUrl: a.image_url, targetUrl: a.target_url})); },
   saveAd: async (ad: any) => { return await supabase.from('ads').insert([{ title: ad.title, image_url: ad.imageUrl, target_url: ad.targetUrl, is_active: true, created_at: new Date().toISOString() }]); },
   updateAdStatus: async (id: string, s: boolean) => { return await supabase.from('ads').update({ is_active: s }).eq('id', id); },

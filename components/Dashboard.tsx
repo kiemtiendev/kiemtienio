@@ -53,7 +53,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, setView }) => {
 
       {/* 2. Khung Quảng cáo Slideshow */}
       <div className="pt-4">
-        <div className="relative w-full aspect-[21/9] md:aspect-[21/7] rounded-[2.5rem] overflow-hidden border border-white/5 shadow-2xl bg-slate-900/40 group">
+        <div className="relative w-full aspect-[21/9] md:aspect-[21/7] rounded-[2.5rem] overflow-hidden border border-white/5 shadow-2xl bg-slate-900/40 group cursor-pointer">
           {ads.length > 0 ? (
             <>
               {ads.map((ad, idx) => (
@@ -64,10 +64,18 @@ const Dashboard: React.FC<DashboardProps> = ({ user, setView }) => {
                   rel="noopener noreferrer"
                   className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${idx === currentAdIndex ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
                 >
-                  <img src={ad.imageUrl} alt={ad.title} className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-6 md:p-10">
-                    <span className="text-blue-400 font-black text-[8px] uppercase tracking-widest mb-1 italic">TÀI TRỢ NOVA</span>
-                    <h3 className="text-white text-lg md:text-2xl font-black italic uppercase tracking-tighter leading-none">{ad.title}</h3>
+                  <img 
+                    src={ad.imageUrl} 
+                    alt={ad.title} 
+                    className="w-full h-full object-cover transition-transform duration-1000 ease-out group-hover:scale-110" 
+                  />
+                  
+                  {/* Hover Overlay Effect (Blue Tint) */}
+                  <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-blue-900/40 opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent flex flex-col justify-end p-6 md:p-10 transition-all duration-700 group-hover:from-black/95">
+                    <span className="text-blue-400 font-black text-[8px] uppercase tracking-widest mb-1 italic transform translate-y-0 transition-transform duration-500 group-hover:-translate-y-1">TÀI TRỢ NOVA</span>
+                    <h3 className="text-white text-lg md:text-2xl font-black italic uppercase tracking-tighter leading-none transform translate-y-0 transition-transform duration-500 group-hover:-translate-y-1">{ad.title}</h3>
                   </div>
                 </a>
               ))}

@@ -90,11 +90,14 @@ export interface WithdrawalRequest {
 }
 
 export interface Giftcode {
+  id: string; // Thêm ID để sửa/xóa
   code: string;
   amount: number;
   maxUses: number;
   usedBy: string[];
   createdAt: string;
+  startDate?: string; // Thời gian bắt đầu
+  endDate?: string;   // Thời gian kết thúc
   isActive?: boolean;
 }
 
