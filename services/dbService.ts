@@ -85,9 +85,10 @@ export const dbService = {
     let isUnique = false;
     let attempts = 0;
 
+    // Thử tạo ID tối đa 5 lần để đảm bảo không trùng
     while (!isUnique && attempts < 5) {
         random8DigitId = Math.floor(10000000 + Math.random() * 90000000).toString();
-        // Kiểm tra xem ID này đã tồn tại chưa
+        // Kiểm tra xem ID này đã tồn tại trong DB chưa
         const { data } = await supabase.from('users_data').select('id').eq('id', random8DigitId).maybeSingle();
         if (!data) {
             isUnique = true;
@@ -207,11 +208,12 @@ export const dbService = {
     const amount = Number(gcRaw.amount || 0);
     const usedByArray = Array.isArray(gcRaw.used_by) ? gcRaw.used_by : [];
 
-    // FIX LỖI 1: Kiểm tra xem user đã dùng chưa (So sánh chuỗi chặt chẽ)
+    // FIX LỖI 1: Kiểm tra xem user đã dùng chưa (So sánh chuỗi chặt chẽ để tránh lỗi type)
     if (usedByArray.some((id: any) => String(id) === safeUserId)) {
         return { success: false, message: 'Bạn đã sử dụng mã này rồi.' };
     }
     
+    // FIX LỖI 2: Kiểm tra giới hạn lượt dùng
     if (maxUses > 0 && usedByArray.length >= maxUses) {
       return { success: false, message: 'Mã đã đạt giới hạn lượt sử dụng.' };
     }
@@ -234,7 +236,7 @@ export const dbService = {
         return { success: false, message: `Lỗi hệ thống: ${updErr.message}` };
     }
 
-    // 4. FIX LỖI 2: Cập nhật lượt dùng vào Giftcode (Thêm ID vào mảng)
+    // 4. CẬP NHẬT LƯỢT DÙNG VÀO GIFTCODE (Quan trọng: Update mảng used_by)
     const newUsedBy = [...usedByArray, safeUserId];
     
     const { error: gcUpdateErr } = await supabase.from('giftcodes')
@@ -243,8 +245,6 @@ export const dbService = {
 
     if (gcUpdateErr) {
          console.error("Lỗi cập nhật giftcode used_by:", gcUpdateErr);
-         // Lưu ý: Tiền đã cộng nhưng không update được giftcode. 
-         // Trong thực tế nên dùng transaction (RPC) nhưng ở đây chấp nhận rủi ro nhỏ để giữ code đơn giản.
     }
     
     return { success: true, amount: amount, message: `Thành công! Nhận ${amount.toLocaleString()} P.` };
