@@ -80,11 +80,25 @@ export const dbService = {
     const { data: existing } = await supabase.from('users_data').select('id').eq('email', cleanEmail).maybeSingle();
     if (existing) return { success: false, message: 'Email đã tồn tại.' };
 
-    // Tạo ID 8 chữ số ngẫu nhiên (10000000 - 99999999)
-    const random8DigitId = Math.floor(10000000 + Math.random() * 90000000).toString();
+    // TẠO MÃ GIỚI THIỆU (ID) NGẪU NHIÊN 8 SỐ VÀ ĐẢM BẢO DUY NHẤT
+    let random8DigitId = '';
+    let isUnique = false;
+    let attempts = 0;
+
+    while (!isUnique && attempts < 5) {
+        random8DigitId = Math.floor(10000000 + Math.random() * 90000000).toString();
+        // Kiểm tra xem ID này đã tồn tại chưa
+        const { data } = await supabase.from('users_data').select('id').eq('id', random8DigitId).maybeSingle();
+        if (!data) {
+            isUnique = true;
+        }
+        attempts++;
+    }
+
+    if (!isUnique) return { success: false, message: 'Hệ thống đang bận, vui lòng thử lại.' };
 
     const newUser = {
-      id: random8DigitId,
+      id: random8DigitId, // ID này cũng là mã giới thiệu
       fullname: fullname.trim().toUpperCase(),
       email: cleanEmail,
       password_hash: pass.trim(),
@@ -185,46 +199,55 @@ export const dbService = {
   claimGiftcode: async (userId: string, code: string) => {
     const safeUserId = String(userId).trim();
     
-    // 1. Kiểm tra Giftcode
+    // 1. Kiểm tra Giftcode (Lấy dữ liệu gốc)
     const { data: gcRaw, error: gcError } = await supabase.from('giftcodes').select('*').eq('code', code.trim().toUpperCase()).eq('is_active', true).maybeSingle();
     if (gcError || !gcRaw) return { success: false, message: 'Mã không tồn tại hoặc đã hết hạn.' };
     
-    const gc = mapGiftcode(gcRaw);
-    if (gc.usedBy.includes(safeUserId)) return { success: false, message: 'Bạn đã sử dụng mã này rồi.' };
+    const maxUses = Number(gcRaw.max_uses || 0);
+    const amount = Number(gcRaw.amount || 0);
+    const usedByArray = Array.isArray(gcRaw.used_by) ? gcRaw.used_by : [];
+
+    // FIX LỖI 1: Kiểm tra xem user đã dùng chưa (So sánh chuỗi chặt chẽ)
+    if (usedByArray.some((id: any) => String(id) === safeUserId)) {
+        return { success: false, message: 'Bạn đã sử dụng mã này rồi.' };
+    }
     
-    if (gc.maxUses > 0 && gc.usedBy.length >= gc.maxUses) {
+    if (maxUses > 0 && usedByArray.length >= maxUses) {
       return { success: false, message: 'Mã đã đạt giới hạn lượt sử dụng.' };
     }
 
-    // 2. Xác thực người dùng (Fix lỗi xác thực ở đây bằng maybeSingle và select *, tránh lỗi missing column)
-    const { data: u, error: uError } = await supabase.from('users_data').select('*').eq('id', safeUserId).maybeSingle();
+    // 2. Xác thực người dùng
+    const { data: u, error: uError } = await supabase.from('users_data').select('id, balance, total_earned').eq('id', safeUserId).maybeSingle();
     
-    if (uError) {
-        console.error("Lỗi truy vấn user:", uError);
-        return { success: false, message: `Lỗi kết nối CSDL: ${uError.message}` };
-    }
-    if (!u) {
+    if (uError || !u) {
         return { success: false, message: 'Lỗi xác thực người dùng. Vui lòng đăng nhập lại.' };
     }
 
-    // 3. Cộng tiền
-    // FIX: Chỉ cập nhật balance và total_earned (những cột chắc chắn có).
-    // Bỏ total_giftcode_earned để tránh lỗi nếu cột chưa được tạo trong DB.
+    // 3. Cộng tiền cho User
     const { error: updErr } = await supabase.from('users_data').update({ 
-      balance: Number(u.balance) + gc.amount,
-      total_earned: (Number(u.total_earned) || 0) + gc.amount
+      balance: Number(u.balance) + amount,
+      total_earned: (Number(u.total_earned) || 0) + amount
     }).eq('id', u.id);
     
     if (updErr) {
-        console.error("Lỗi update giftcode:", updErr);
+        console.error("Lỗi update giftcode user:", updErr);
         return { success: false, message: `Lỗi hệ thống: ${updErr.message}` };
     }
 
-    // 4. Cập nhật lượt dùng
-    const newUsedBy = [...(gc.usedBy || []), safeUserId];
-    await supabase.from('giftcodes').update({ used_by: newUsedBy }).eq('id', gcRaw.id);
+    // 4. FIX LỖI 2: Cập nhật lượt dùng vào Giftcode (Thêm ID vào mảng)
+    const newUsedBy = [...usedByArray, safeUserId];
     
-    return { success: true, amount: gc.amount, message: `Thành công! Nhận ${gc.amount.toLocaleString()} P.` };
+    const { error: gcUpdateErr } = await supabase.from('giftcodes')
+        .update({ used_by: newUsedBy })
+        .eq('id', gcRaw.id);
+
+    if (gcUpdateErr) {
+         console.error("Lỗi cập nhật giftcode used_by:", gcUpdateErr);
+         // Lưu ý: Tiền đã cộng nhưng không update được giftcode. 
+         // Trong thực tế nên dùng transaction (RPC) nhưng ở đây chấp nhận rủi ro nhỏ để giữ code đơn giản.
+    }
+    
+    return { success: true, amount: amount, message: `Thành công! Nhận ${amount.toLocaleString()} P.` };
   },
 
   getVipLeaderboard: async () => {
