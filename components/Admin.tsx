@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { User, WithdrawalRequest, Giftcode, AdBanner, Announcement, Notification } from '../types.ts';
+import { User, WithdrawalRequest, Giftcode, AdBanner, Announcement, Notification, VipTier } from '../types.ts';
 import { dbService, supabase } from '../services/dbService.ts';
 import { formatK, RATE_VND_TO_POINT } from '../constants.tsx';
 import { 
@@ -8,7 +8,7 @@ import {
   PlusCircle, Search, CheckCircle2, XCircle, Settings, UserMinus, 
   UserPlus, ShieldAlert, Ban, Unlock, Wallet, Activity, TrendingUp, DollarSign,
   RefreshCcw, UserX, AlertTriangle, Loader2, X, ShieldCheck, Edit, Calendar, Clock,
-  Building2, Gamepad2, FileText, ExternalLink, Copy
+  Building2, Gamepad2, FileText, ExternalLink, Copy, Crown
 } from 'lucide-react';
 
 interface AdminProps {
@@ -232,6 +232,24 @@ export default function Admin({ user, onUpdateUser, setSecurityModal, showToast,
     return localISOTime;
   };
 
+  const getVipRichStyle = (tier: VipTier) => {
+    switch(tier) {
+      case VipTier.ELITE: return 'elite-border-rich';
+      case VipTier.PRO: return 'pro-border-rich';
+      case VipTier.BASIC: return 'basic-border-rich';
+      default: return 'border-white/10';
+    }
+  };
+
+  const getVipCrownColor = (tier: VipTier) => {
+    switch(tier) {
+      case VipTier.ELITE: return 'text-purple-400 fill-purple-400';
+      case VipTier.PRO: return 'text-amber-400 fill-amber-400';
+      case VipTier.BASIC: return 'text-blue-400 fill-blue-400';
+      default: return 'text-slate-400 fill-slate-400';
+    }
+  };
+
   return (
     <div className="space-y-10 animate-in fade-in pb-32">
       <div className="glass-card p-8 rounded-[3.5rem] border border-blue-500/20 bg-blue-600/5 flex items-center justify-center md:justify-between shadow-2xl flex-wrap gap-4">
@@ -291,8 +309,20 @@ export default function Admin({ user, onUpdateUser, setSecurityModal, showToast,
                   {filteredUsers.map((u) => (
                     <tr key={u.id} className={`text-xs group hover:bg-white/[0.03] transition-all ${u.isBanned ? 'bg-red-500/5' : ''}`}>
                       <td className="px-6 py-7">
-                         <div className="font-black text-white uppercase flex items-center gap-3 italic text-sm">{u.fullname} {u.isBanned && <span className="text-red-500 text-[8px] bg-red-500/10 px-2 py-0.5 rounded border border-red-500/20">BỊ KHÓA</span>}</div>
-                         <div className="text-[10px] text-slate-600 font-bold mt-1 tracking-wider">{u.email}</div>
+                         <div className="flex items-center gap-4">
+                           <div className={`w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center relative border ${getVipRichStyle(u.vipTier)}`}>
+                              {u.avatarUrl ? (
+                                <img src={u.avatarUrl} className="w-full h-full object-cover rounded-lg" />
+                              ) : (
+                                <span className="font-black text-white italic">{u.fullname.charAt(0).toUpperCase()}</span>
+                              )}
+                              {u.isVip && <Crown className={`absolute -top-3 -right-3 w-5 h-5 vip-crown-float ${getVipCrownColor(u.vipTier)}`} />}
+                           </div>
+                           <div>
+                              <div className="font-black text-white uppercase flex items-center gap-2 italic text-sm">{u.fullname} {u.isBanned && <span className="text-red-500 text-[8px] bg-red-500/10 px-2 py-0.5 rounded border border-red-500/20">BỊ KHÓA</span>}</div>
+                              <div className="text-[10px] text-slate-600 font-bold mt-1 tracking-wider">{u.email}</div>
+                           </div>
+                         </div>
                       </td>
                       <td className="px-6 py-7"><span className={`px-4 py-1.5 rounded-xl text-[9px] font-black italic border ${u.isVip ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' : 'text-slate-600 bg-slate-900 border-white/5'}`}>{u.vipTier.toUpperCase()}</span></td>
                       <td className="px-6 py-7 font-black text-emerald-500 text-base">{u.balance.toLocaleString()} P</td>
@@ -317,6 +347,7 @@ export default function Admin({ user, onUpdateUser, setSecurityModal, showToast,
           </div>
         )}
 
+        {/* ... (Các tab khác giữ nguyên, chỉ thay đổi tab users) ... */}
         {tab === 'withdrawals' && (
           <div className="space-y-8">
             <h3 className="text-2xl font-black text-white italic uppercase tracking-tighter">DUYỆT YÊU CẦU RÚT TIỀN</h3>

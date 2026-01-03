@@ -111,7 +111,8 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
           <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
              <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-3 italic">Tài trợ Nova</p>
-             <div className="relative w-full h-24 rounded-xl overflow-hidden group cursor-pointer bg-slate-800 shadow-inner">
+             {/* Changed to aspect-[16/9] and added object-fill to ensure full visibility */}
+             <div className="relative w-full aspect-[16/9] rounded-xl overflow-hidden group cursor-pointer bg-slate-900 shadow-inner border border-white/10">
                {ads.length > 0 ? (
                  ads.map((ad, idx) => (
                    <a 
@@ -123,7 +124,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                    >
                      <img 
                         src={ad.imageUrl} 
-                        className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105" 
+                        className="w-full h-full object-fill transition-transform duration-700 ease-out group-hover:scale-105" 
                         alt={ad.title} 
                      />
                      {/* Overlay gradient similar to dashboard */}

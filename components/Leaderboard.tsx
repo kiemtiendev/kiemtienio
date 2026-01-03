@@ -76,7 +76,11 @@ const Leaderboard: React.FC = () => {
           <div className="order-2 md:order-1 glass-card p-10 rounded-[3.5rem] flex flex-col items-center text-center relative mt-12 border-slate-400/20 bg-gradient-to-b from-slate-400/5 to-transparent hover:scale-105 transition-all">
             <div className="absolute -top-14 left-1/2 -translate-x-1/2">
               <div className={`w-24 h-24 rounded-[2rem] flex items-center justify-center border-4 relative ${getVipRichStyle(top2.vipTier)} bg-slate-800`}>
-                {top2.avatarUrl ? <img src={top2.avatarUrl} className="w-full h-full object-cover rounded-[1.8rem]" /> : <Medal className="w-12 h-12 text-slate-100" />}
+                {top2.avatarUrl ? (
+                   <img src={top2.avatarUrl} className="w-full h-full object-cover rounded-[1.8rem]" />
+                ) : (
+                   <span className="font-black text-3xl text-white italic">{top2.fullname.charAt(0).toUpperCase()}</span>
+                )}
                 {top2.isVip && <Crown className={`absolute -top-5 -right-5 w-10 h-10 vip-crown-float ${getVipCrownColor(top2.vipTier)}`} />}
               </div>
               <div className="absolute -bottom-2 -right-2 bg-slate-800 text-white w-10 h-10 rounded-xl flex items-center justify-center font-black border-2 border-slate-600 text-lg">2</div>
@@ -95,7 +99,11 @@ const Leaderboard: React.FC = () => {
           <div className="order-1 md:order-2 glass-card p-12 rounded-[4rem] flex flex-col items-center text-center relative transform scale-110 border-amber-500/40 bg-gradient-to-b from-amber-500/10 to-transparent shadow-[0_0_60px_rgba(245,158,11,0.15)]">
             <div className="absolute -top-16 left-1/2 -translate-x-1/2">
               <div className={`w-28 h-28 rounded-[2.5rem] flex items-center justify-center border-4 relative ${getVipRichStyle(top1.vipTier)} bg-slate-900 shadow-glow-amber animate-pulse`}>
-                {top1.avatarUrl ? <img src={top1.avatarUrl} className="w-full h-full object-cover rounded-[2.2rem]" /> : <Crown className="w-16 h-16 text-amber-400" />}
+                {top1.avatarUrl ? (
+                   <img src={top1.avatarUrl} className="w-full h-full object-cover rounded-[2.2rem]" />
+                ) : (
+                   <span className="font-black text-4xl text-white italic">{top1.fullname.charAt(0).toUpperCase()}</span>
+                )}
                 {top1.isVip && <Crown className={`absolute -top-6 -right-6 w-12 h-12 vip-crown-float ${getVipCrownColor(top1.vipTier)}`} />}
               </div>
               <div className="absolute -bottom-2 -right-2 bg-amber-400 text-slate-950 w-12 h-12 rounded-2xl flex items-center justify-center font-black border-2 border-slate-950 text-xl shadow-2xl">1</div>
@@ -114,7 +122,11 @@ const Leaderboard: React.FC = () => {
           <div className="order-3 md:order-3 glass-card p-10 rounded-[3.5rem] flex flex-col items-center text-center relative mt-12 border-orange-700/20 bg-gradient-to-b from-orange-700/5 to-transparent hover:scale-105 transition-all">
             <div className="absolute -top-14 left-1/2 -translate-x-1/2">
               <div className={`w-24 h-24 rounded-[2rem] flex items-center justify-center border-4 relative ${getVipRichStyle(top3.vipTier)} bg-slate-800`}>
-                {top3.avatarUrl ? <img src={top3.avatarUrl} className="w-full h-full object-cover rounded-[1.8rem]" /> : <Medal className="w-12 h-12 text-orange-200" />}
+                {top3.avatarUrl ? (
+                   <img src={top3.avatarUrl} className="w-full h-full object-cover rounded-[1.8rem]" />
+                ) : (
+                   <span className="font-black text-3xl text-white italic">{top3.fullname.charAt(0).toUpperCase()}</span>
+                )}
                 {top3.isVip && <Crown className={`absolute -top-5 -right-5 w-10 h-10 vip-crown-float ${getVipCrownColor(top3.vipTier)}`} />}
               </div>
               <div className="absolute -bottom-2 -right-2 bg-orange-900 text-white w-10 h-10 rounded-xl flex items-center justify-center font-black border-2 border-orange-700 text-lg">3</div>
@@ -158,7 +170,11 @@ const Leaderboard: React.FC = () => {
                   <td className="px-10 py-8">
                     <div className="flex items-center gap-5">
                       <div className={`w-12 h-12 bg-slate-800 rounded-2xl flex items-center justify-center text-sm font-black text-white italic border-2 relative ${getVipRichStyle(user.vipTier)}`}>
-                        {user.avatarUrl ? <img src={user.avatarUrl} className="w-full h-full object-cover rounded-xl" /> : user.fullname.charAt(0)}
+                        {user.avatarUrl ? (
+                           <img src={user.avatarUrl} className="w-full h-full object-cover rounded-xl" />
+                        ) : (
+                           <span className="font-black text-lg">{user.fullname.charAt(0).toUpperCase()}</span>
+                        )}
                         {user.isVip && <Crown className={`absolute -top-3 -right-3 w-6 h-6 vip-crown-float ${getVipCrownColor(user.vipTier)}`} />}
                       </div>
                       <div className="flex flex-col">

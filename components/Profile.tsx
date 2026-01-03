@@ -87,7 +87,7 @@ const Profile: React.FC<Props> = ({ user, onUpdateUser }) => {
            {user.avatarUrl ? (
              <img src={user.avatarUrl} className="w-full h-full object-cover rounded-[2.2rem]" />
            ) : (
-             <Fingerprint className="w-12 h-12 text-slate-700" />
+             <span className="font-black text-5xl text-white italic">{user.fullname.charAt(0).toUpperCase()}</span>
            )}
            {user.isVip && <Crown className={`absolute -top-6 -right-6 w-12 h-12 vip-crown-float ${getVipCrownColor()}`} />}
         </div>

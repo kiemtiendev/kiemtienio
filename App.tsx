@@ -133,7 +133,7 @@ const App: React.FC = () => {
   if (isLoading) return <div className="min-h-screen bg-[#06080c] flex items-center justify-center text-blue-500 animate-pulse font-black uppercase italic tracking-widest text-xs">Nova Syncing...</div>;
   if (!user) return <Login onLoginSuccess={(u) => { setUser(u); showToast('Chào mừng', `Xin chào ${u.fullname}!`, 'success'); }} />;
 
-  const getVipRichStyle = () => user.vipTier === VipTier.ELITE ? 'elite-border-rich' : user.vipTier === VipTier.PRO ? 'pro-border-rich' : user.vipTier === VipTier.BASIC ? 'basic-border-rich' : 'border-white/10';
+  const getVipRichStyle = () => user.vipTier === VipTier.ELITE ? 'elite-border-rich' : user.vipTier === VipTier.PRO ? 'pro-border-rich' : user.vipTier === VipTier.BASIC ? 'basic-border-rich' : 'border border-white/10';
   const getVipBadgeColor = () => user.vipTier === VipTier.ELITE ? 'text-purple-400' : user.vipTier === VipTier.PRO ? 'text-amber-400' : user.vipTier === VipTier.BASIC ? 'text-blue-400' : 'text-slate-500';
 
   return (
@@ -170,9 +170,13 @@ const App: React.FC = () => {
           </nav>
           <div className="mt-auto pt-6 border-t border-white/5">
              <div className="flex items-center gap-4 px-3 mb-6">
-               <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-white relative border-2 ${getVipRichStyle()}`}>
-                 {user.avatarUrl ? <img src={user.avatarUrl} className="w-full h-full object-cover rounded-xl" /> : user.fullname.charAt(0)}
-                 {user.isVip && <Crown className="absolute -top-3 -right-3 w-6 h-6 vip-crown-float text-amber-400 fill-amber-400" />}
+               <div className={`w-14 h-14 rounded-2xl flex items-center justify-center relative bg-slate-800 ${getVipRichStyle()}`}>
+                 {user.avatarUrl ? (
+                   <img src={user.avatarUrl} className="w-full h-full object-cover rounded-xl" />
+                 ) : (
+                   <span className="font-black text-2xl text-white italic">{user.fullname.charAt(0).toUpperCase()}</span>
+                 )}
+                 {user.isVip && <Crown className="absolute -top-4 -right-4 w-7 h-7 vip-crown-float text-amber-400 fill-amber-400" />}
                </div>
                <div className="overflow-hidden">
                  <span className={`text-[10px] font-black uppercase truncate block ${getVipBadgeColor()}`}>{user.fullname}</span>

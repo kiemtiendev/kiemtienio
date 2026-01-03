@@ -19,7 +19,7 @@ const Tasks: React.FC<Props> = ({ user, onUpdateUser }) => {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [generatingGate, setGeneratingGate] = useState<number | null>(null);
 
-  const isVip = user.vipTier !== 'none';
+  const isVip = user.isVip || user.vipTier !== 'none';
   const currentLimit = isVip ? VIP_TASK_LIMIT : DAILY_TASK_LIMIT;
 
   useEffect(() => {
@@ -48,7 +48,11 @@ const Tasks: React.FC<Props> = ({ user, onUpdateUser }) => {
 
     setGeneratingGate(id);
     const token = `NOVA-${Math.random().toString(36).substr(2, 8).toUpperCase()}`;
-    const taskData = { gateId: id, gateName: gate.name, points: gate.reward, token, timestamp: Date.now() };
+    
+    // TÍNH TOÁN ĐIỂM THƯỞNG: Nếu là VIP thì nhân 1.5, thường thì giữ nguyên
+    const pointsReward = isVip ? Math.floor(gate.reward * 1.5) : gate.reward;
+
+    const taskData = { gateId: id, gateName: gate.name, points: pointsReward, token, timestamp: Date.now() };
     
     localStorage.setItem('nova_pending_task', JSON.stringify(taskData));
     setActiveTask(taskData);
@@ -128,7 +132,9 @@ const Tasks: React.FC<Props> = ({ user, onUpdateUser }) => {
           const id = parseInt(idStr);
           const currentCount = user.taskCounts[gate.name] || 0;
           const isFull = currentCount >= gate.limit;
-          const reward = isVip ? Math.floor(gate.reward * 1.5) : gate.reward;
+          
+          // Hiển thị thưởng dự kiến (x1.5 nếu là VIP)
+          const displayReward = isVip ? Math.floor(gate.reward * 1.5) : gate.reward;
 
           return (
             <div key={id} className={`glass-card p-8 rounded-[2.5rem] border transition-all ${isFull ? 'grayscale opacity-30' : 'border-white/5 bg-slate-900/40 hover:bg-slate-900/60 hover:scale-105'}`}>
@@ -138,7 +144,7 @@ const Tasks: React.FC<Props> = ({ user, onUpdateUser }) => {
                </div>
                <div className="flex items-center justify-between mb-8">
                   <span className="text-[10px] text-slate-500 font-bold uppercase">Thưởng</span>
-                  <span className={`text-2xl font-black italic tracking-tighter ${isVip ? 'text-amber-500' : 'text-emerald-500'}`}>+{formatK(reward)} P</span>
+                  <span className={`text-2xl font-black italic tracking-tighter ${isVip ? 'text-amber-500' : 'text-emerald-500'}`}>+{formatK(displayReward)} P</span>
                </div>
                <button 
                  onClick={() => startTask(id)}

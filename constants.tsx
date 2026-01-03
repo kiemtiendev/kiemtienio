@@ -51,6 +51,7 @@ export const ADMIN_BANKS = [
 export const SLOGAN = "HỆ THỐNG NHIỆM VỤ - KIẾM TIỀN - Nhận Thẻ Game Quân Huy - Kim Cương Miễn Phí";
 export const COPYRIGHT = "Bản quyền bởi DIAMOND NOVA";
 
+// Giá trị gốc (Basic), VIP sẽ được x1.5 trong code xử lý
 export const TASK_RATES: Record<number, { name: string, reward: number, limit: number, apiKey: string }> = {
   1: { name: "LINK4M", reward: 1320, limit: 2, apiKey: "68208afab6b8fc60542289b6" },
   2: { name: "YEULINK", reward: 1320, limit: 4, apiKey: "891b97fa-faa4-4446-bdd3-17add1ea42bc" },
